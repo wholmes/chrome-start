@@ -85,6 +85,9 @@ const themeSelect       = $('themeSelect');
 const backupBtn         = $('backupBtn');
 const restoreBtn        = $('restoreBtn');
 const restoreInput      = $('restoreInput');
+const notesText         = $('notesText');
+const notesSyncBtn      = $('notesSyncBtn');
+const notesSyncStatus   = $('notesSyncStatus');
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
@@ -113,9 +116,11 @@ async function init() {
   applyTheme();
   renderSearchEngineOptions();
   renderThemeSelect();
+  await loadNotes();
   renderGroups();
   bindEvents();
   bindGroupModalEvents();
+  bindNotesEvents();
 }
 
 function applyTheme() {
@@ -559,6 +564,182 @@ async function persist() {
   } catch { /* dev */ }
 }
 
+// ─── Notes ────────────────────────────────────────────────────────────────────
+
+const NOTES_STORAGE_KEY = 'notesContent';
+const NOTES_GOOGLE_DOC_ID_KEY = 'notesGoogleDocId';
+const NOTES_GOOGLE_TOKEN_KEY = 'notesGoogleAccessToken';
+const GOOGLE_OAUTH_SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file';
+// Replace with your OAuth 2.0 Client ID (Chrome application) from Google Cloud Console
+const GOOGLE_OAUTH_CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
+
+let notesSaveTimer = null;
+
+async function loadNotes() {
+  try {
+    const result = await chrome.storage.local.get([NOTES_STORAGE_KEY]);
+    const content = result[NOTES_STORAGE_KEY];
+    if (typeof content === 'string' && notesText) notesText.value = content;
+  } catch { /* dev */ }
+}
+
+async function persistNotes() {
+  if (!notesText) return;
+  try {
+    await chrome.storage.local.set({ [NOTES_STORAGE_KEY]: notesText.value });
+  } catch { /* dev */ }
+}
+
+function setNotesSyncStatus(message, type = '') {
+  if (!notesSyncStatus) return;
+  notesSyncStatus.textContent = message;
+  notesSyncStatus.className = 'notes-sync-status' + (type ? ' sync-' + type : '');
+}
+
+function bindNotesEvents() {
+  if (!notesText) return;
+  notesText.addEventListener('input', () => {
+    if (notesSaveTimer) clearTimeout(notesSaveTimer);
+    notesSaveTimer = setTimeout(persistNotes, 500);
+  });
+  if (notesSyncBtn) notesSyncBtn.addEventListener('click', () => syncNotesToGoogle());
+}
+
+async function getGoogleAccessToken() {
+  if (GOOGLE_OAUTH_CLIENT_ID.startsWith('YOUR_')) {
+    setNotesSyncStatus('Add your Google OAuth client ID in the code (see README)', 'sync-error');
+    return null;
+  }
+  try {
+    const redirectUrl = chrome.identity.getRedirectURL();
+    const authUrl =
+      'https://accounts.google.com/o/oauth2/v2/auth?' +
+      'client_id=' + encodeURIComponent(GOOGLE_OAUTH_CLIENT_ID) +
+      '&redirect_uri=' + encodeURIComponent(redirectUrl) +
+      '&response_type=token' +
+      '&scope=' + encodeURIComponent(GOOGLE_OAUTH_SCOPES) +
+      '&prompt=consent';
+    const responseUrl = await new Promise((resolve, reject) => {
+      chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, (u) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(u);
+      });
+    });
+    if (!responseUrl) return null;
+    const hash = responseUrl.split('#')[1];
+    if (!hash) return null;
+    const params = new URLSearchParams(hash);
+    const token = params.get('access_token');
+    if (token) {
+      try {
+        await chrome.storage.local.set({ [NOTES_GOOGLE_TOKEN_KEY]: token });
+      } catch { /* ignore */ }
+    }
+    return token;
+  } catch (e) {
+    setNotesSyncStatus('Sign-in failed: ' + (e.message || 'Unknown error'), 'sync-error');
+    return null;
+  }
+}
+
+async function ensureGoogleDoc(token) {
+  let result = await chrome.storage.local.get([NOTES_GOOGLE_DOC_ID_KEY]);
+  let docId = result[NOTES_GOOGLE_DOC_ID_KEY];
+  if (docId) return docId;
+  const res = await fetch('https://docs.googleapis.com/v1/documents', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title: 'Start Page Notes' }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || res.statusText || 'Failed to create doc');
+  }
+  const data = await res.json();
+  docId = data.documentId;
+  if (docId) await chrome.storage.local.set({ [NOTES_GOOGLE_DOC_ID_KEY]: docId });
+  return docId;
+}
+
+function extractTextFromDoc(doc) {
+  if (!doc?.body?.content) return '';
+  let text = '';
+  for (const el of doc.body.content) {
+    if (el.paragraph?.elements) {
+      for (const run of el.paragraph.elements) {
+        if (run.textRun?.content) text += run.textRun.content;
+      }
+    }
+  }
+  return text;
+}
+
+async function syncNotesToGoogle() {
+  setNotesSyncStatus('Syncing…');
+  let token = null;
+  try {
+    const stored = await chrome.storage.local.get([NOTES_GOOGLE_TOKEN_KEY]);
+    token = stored[NOTES_GOOGLE_TOKEN_KEY];
+  } catch { /* ignore */ }
+  if (!token) token = await getGoogleAccessToken();
+  if (!token) return;
+  try {
+    const docId = await ensureGoogleDoc(token);
+    const content = notesText ? notesText.value : '';
+    const res = await fetch('https://docs.googleapis.com/v1/documents/' + docId, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!res.ok) throw new Error('Failed to load doc');
+    const doc = await res.json();
+    const contentEl = doc.body?.content;
+    if (!contentEl?.length) throw new Error('Invalid doc structure');
+    const startIndex = 1;
+    let endIndex = 1;
+    for (const el of contentEl) {
+      if (el.endIndex != null) endIndex = el.endIndex;
+    }
+    const requests = [];
+    if (endIndex > startIndex) {
+      requests.push({
+        deleteContentRange: {
+          range: { startIndex, endIndex },
+        },
+      });
+    }
+    const textToInsert = content + '\n';
+    if (textToInsert.length > 0) {
+      requests.push({
+        insertText: {
+          location: { index: startIndex },
+          text: textToInsert,
+        },
+      });
+    }
+    if (requests.length === 0) {
+      setNotesSyncStatus('Synced', 'sync-success');
+      return;
+    }
+    const updateRes = await fetch('https://docs.googleapis.com/v1/documents/' + docId + ':batchUpdate', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ requests }),
+    });
+    if (!updateRes.ok) {
+      const err = await updateRes.json().catch(() => ({}));
+      throw new Error(err.error?.message || updateRes.statusText || 'Failed to update doc');
+    }
+    setNotesSyncStatus('Synced to Google Docs', 'sync-success');
+  } catch (e) {
+    setNotesSyncStatus(e.message || 'Sync failed', 'sync-error');
+  }
+}
+
 // ─── Backup & Restore ───────────────────────────────────────────────────────
 
 function exportBackup() {
@@ -568,6 +749,7 @@ function exportBackup() {
     shortcuts,
     groups,
     settings,
+    notes: notesText ? notesText.value : '',
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -609,6 +791,10 @@ function restoreFromBackup(file) {
       if (data.settings && typeof data.settings === 'object') {
         if (typeof data.settings.searchEngine === 'string') settings.searchEngine = data.settings.searchEngine;
         if (['dark', 'light', 'system'].includes(data.settings.theme)) settings.theme = data.settings.theme;
+      }
+      if (typeof data.notes === 'string' && notesText) {
+        notesText.value = data.notes;
+        persistNotes();
       }
       persist();
       applyTheme();

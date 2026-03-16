@@ -325,6 +325,72 @@ html, body {
   border-color: var(--border-active);
 }
 
+/* ─── Notes ───────────────────────────────────────────────── */
+.notes-section {
+  width: 100%;
+  max-width: 760px;
+  margin-bottom: 32px;
+  animation: pageIn 0.55s 0.15s ease both;
+}
+
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notes-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.notes-sync-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notes-sync-status {
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.notes-sync-status.sync-success { color: var(--accent); }
+.notes-sync-status.sync-error { color: var(--danger); }
+
+.notes-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.notes-textarea::placeholder {
+  color: var(--muted);
+}
+
+.notes-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 /* ─── Shortcuts section ──────────────────────────────────── */
 .shortcuts-section {
   width: 100%;

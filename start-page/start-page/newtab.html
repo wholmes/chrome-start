@@ -56,6 +56,26 @@
       </div>
     </div>
 
+    <!-- Notes -->
+    <section class="notes-section" id="notesSection">
+      <div class="notes-header">
+        <h3 class="notes-title">Notes</h3>
+        <div class="notes-sync-row">
+          <span class="notes-sync-status" id="notesSyncStatus" aria-live="polite"></span>
+          <button type="button" class="add-fab add-fab-sm" id="notesSyncBtn" title="Sync to Google Docs">
+            Sync to Google
+          </button>
+        </div>
+      </div>
+      <textarea
+        id="notesText"
+        class="notes-textarea"
+        placeholder="Quick notes… (synced to Google Docs when you click Sync)"
+        rows="4"
+        spellcheck="true"
+      ></textarea>
+    </section>
+
     <!-- Shortcuts by group -->
     <section class="shortcuts-section" id="shortcutsSection">
       <div class="groups-container" id="groupsContainer"></div>
