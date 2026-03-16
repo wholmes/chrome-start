@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Tab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;1,300&family=Syne:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="newtab.css" />
+</head>
+<body>
+
+  <!-- Ambient background orb -->
+  <div class="bg-orb"></div>
+
+  <main class="page" id="page">
+
+    <!-- Top: clock + date -->
+    <header class="top">
+      <p class="greeting" id="greeting"></p>
+      <p class="date-str" id="dateStr"></p>
+      <div class="clock" id="clock"></div>
+    </header>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <div class="search-row">
+        <svg class="search-ico" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="8.5" cy="8.5" r="5.75" stroke="currentColor" stroke-width="1.25"/>
+          <path d="M13 13L17.5 17.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+        </svg>
+        <input
+          id="search"
+          class="search-input"
+          type="search"
+          placeholder="Search the web…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <kbd class="search-hint">↵</kbd>
+      </div>
+      <div class="search-options-row">
+        <div class="search-engine-row">
+          <label for="searchEngine" class="search-engine-label">Search with</label>
+          <select id="searchEngine" class="search-engine-select" aria-label="Search engine"></select>
+        </div>
+        <div class="theme-row">
+          <span class="theme-label">Theme</span>
+          <select id="themeSelect" class="search-engine-select" aria-label="Theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shortcuts by group -->
+    <section class="shortcuts-section" id="shortcutsSection">
+      <div class="groups-container" id="groupsContainer"></div>
+      <div class="section-actions">
+        <button class="add-fab" id="addGroupBtn" title="Add group">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Add group
+        </button>
+        <button class="add-fab" id="addBtn" title="Add shortcut">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Add shortcut
+        </button>
+        <span class="section-actions-divider" aria-hidden="true">·</span>
+        <button type="button" class="add-fab add-fab-ghost" id="backupBtn" title="Download backup of shortcuts and groups">
+          Backup
+        </button>
+        <button type="button" class="add-fab add-fab-ghost" id="restoreBtn" title="Restore from a backup file">
+          Restore
+        </button>
+        <input type="file" id="restoreInput" accept=".json,application/json" hidden aria-label="Choose backup file">
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal overlay -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
+    <div class="modal" id="modal">
+
+      <div class="modal-head">
+        <h2 class="modal-title" id="modalHeading">New Shortcut</h2>
+        <button class="icon-btn" id="closeBtn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+
+        <label class="field">
+          <span class="label">Group</span>
+          <select id="fGroup" class="field-select"></select>
+        </label>
+
+        <label class="field">
+          <span class="label">Name</span>
+          <input id="fName" type="text" placeholder="GitHub" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span class="label">URL</span>
+          <input id="fUrl" type="url" placeholder="https://github.com" />
+        </label>
+
+        <div class="field">
+          <span class="label">Accent color</span>
+          <div class="accent-row">
+            <input id="fColor" type="color" value="#e8c97a" title="Pick a color" />
+            <div class="swatches" id="swatches"></div>
+          </div>
+        </div>
+
+        <label class="field">
+          <span class="label">
+            SVG Icon
+            <em>paste raw &lt;svg&gt; code</em>
+          </span>
+          <textarea
+            id="fSvg"
+            rows="5"
+            placeholder='<svg viewBox="0 0 24 24" fill="currentColor">…</svg>'
+            spellcheck="false"
+          ></textarea>
+        </label>
+
+        <div class="preview-row">
+          <span class="label">Preview</span>
+          <div class="icon-preview" id="iconPreview"></div>
+        </div>
+
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn-danger" id="deleteBtn" style="visibility:hidden">Delete</button>
+        <div class="foot-actions">
+          <button class="btn-ghost" id="cancelBtn">Cancel</button>
+          <button class="btn-primary" id="saveBtn">Save shortcut</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Group modal -->
+  <div class="overlay" id="groupOverlay" role="dialog" aria-modal="true" aria-labelledby="groupModalHeading">
+    <div class="modal modal-sm" id="groupModal">
+      <div class="modal-head">
+        <h2 class="modal-title" id="groupModalHeading">New group</h2>
+        <button class="icon-btn" id="groupCloseBtn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span class="label">Group name</span>
+          <input id="fGroupName" type="text" placeholder="e.g. Work, Personal" autocomplete="off" />
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-danger" id="groupDeleteBtn" style="visibility:hidden">Delete group</button>
+        <div class="foot-actions">
+          <button class="btn-ghost" id="groupCancelBtn">Cancel</button>
+          <button class="btn-primary" id="groupSaveBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="newtab.js"></script>
+</body>
+</html>
