@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Copyright (c) 2025 Whittfield Holmes. MIT License. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -16,11 +17,16 @@
 
   <main class="page" id="page">
 
-    <!-- Top: clock + date -->
+    <!-- Top: clock + date + weather -->
     <header class="top">
       <p class="greeting" id="greeting"></p>
       <p class="date-str" id="dateStr"></p>
       <div class="clock" id="clock"></div>
+      <div class="weather-badge" id="weatherBadge" aria-live="polite" hidden>
+        <span class="weather-icon" id="weatherIcon" aria-hidden="true"></span>
+        <span class="weather-temp" id="weatherTemp"></span>
+        <span class="weather-desc" id="weatherDesc"></span>
+      </div>
     </header>
 
     <!-- Search -->
@@ -102,6 +108,10 @@
         <input type="file" id="restoreInput" accept=".json,application/json" hidden aria-label="Choose backup file">
       </div>
     </section>
+
+    <footer class="page-footer" role="contentinfo">
+      <p class="footer-copyright">© 2025 Whittfield Holmes</p>
+    </footer>
 
   </main>
 

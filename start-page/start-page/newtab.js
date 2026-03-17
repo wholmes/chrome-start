@@ -1,5 +1,6 @@
 /* ─────────────────────────────────────────────────────────────
    Start Page · newtab.js
+   Copyright (c) 2025 Whittfield Holmes. MIT License.
    ─────────────────────────────────────────────────────────────  */
 
 'use strict';
@@ -88,6 +89,46 @@ const restoreInput      = $('restoreInput');
 const notesText         = $('notesText');
 const notesSyncBtn      = $('notesSyncBtn');
 const notesSyncStatus   = $('notesSyncStatus');
+const weatherBadge      = $('weatherBadge');
+const weatherIcon       = $('weatherIcon');
+const weatherTemp       = $('weatherTemp');
+const weatherDesc       = $('weatherDesc');
+
+// ─── Weather (Open-Meteo, no API key) ─────────────────────────────────────────
+const WEATHER_CACHE_KEY = 'weatherCache';
+const WEATHER_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
+
+const WMO_TO_THEME = {
+  0: 'clear',
+  1: 'partly-cloudy', 2: 'partly-cloudy', 3: 'cloudy',
+  45: 'fog', 48: 'fog',
+  51: 'rain', 53: 'rain', 55: 'rain', 56: 'rain', 57: 'rain',
+  61: 'rain', 63: 'rain', 65: 'rain', 66: 'rain', 67: 'rain',
+  71: 'snow', 73: 'snow', 75: 'snow', 77: 'snow',
+  80: 'rain', 81: 'rain', 82: 'rain',
+  85: 'snow', 86: 'snow',
+  95: 'storm', 96: 'storm', 99: 'storm',
+};
+
+const WEATHER_ICONS = {
+  clear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+  'partly-cloudy': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/><circle cx="12" cy="12" r="3"/><path d="M18 14a4 4 0 0 0-8 0c0 1.5.8 2.8 2 3.5"/></svg>',
+  cloudy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/></svg>',
+  fog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 14h16M4 18h16M6 10h12M6 6h10"/></svg>',
+  rain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/><path d="M8 19v2M12 19v2M16 19v2M10 21v-4M14 21v-4"/></svg>',
+  snow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/><path d="M12 17v2M12 15l-1.5 1M12 15l1.5 1M12 19l-1.5-1M12 19l1.5-1"/></svg>',
+  storm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/><path d="M13 12l-3 4h4l-3 4"/></svg>',
+};
+
+const WEATHER_LABELS = {
+  clear: 'Clear',
+  'partly-cloudy': 'Partly cloudy',
+  cloudy: 'Cloudy',
+  fog: 'Fog',
+  rain: 'Rain',
+  snow: 'Snow',
+  storm: 'Storm',
+};
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
@@ -117,6 +158,8 @@ async function init() {
   renderSearchEngineOptions();
   renderThemeSelect();
   await loadNotes();
+  await loadWeatherFromCache();
+  loadWeather();
   renderGroups();
   bindEvents();
   bindGroupModalEvents();
@@ -135,6 +178,80 @@ function applyTheme() {
 
 function renderThemeSelect() {
   themeSelect.value = settings.theme || 'system';
+}
+
+// ─── Weather ─────────────────────────────────────────────────────────────────
+
+function wmoToTheme(code) {
+  return WMO_TO_THEME[Number(code)] || 'partly-cloudy';
+}
+
+function applyWeatherTheme(themeKey) {
+  const root = document.documentElement;
+  if (themeKey) root.setAttribute('data-weather', themeKey);
+  else root.removeAttribute('data-weather');
+}
+
+function renderWeatherBadge(data) {
+  if (!weatherBadge || !data) return;
+  const themeKey = wmoToTheme(data.weather_code);
+  const temp = data.temperature_2m != null ? Math.round(data.temperature_2m) : '';
+  if (weatherIcon) weatherIcon.innerHTML = WEATHER_ICONS[themeKey] || WEATHER_ICONS.cloudy;
+  if (weatherTemp) weatherTemp.textContent = temp !== '' ? `${temp}°` : '';
+  if (weatherDesc) weatherDesc.textContent = WEATHER_LABELS[themeKey] || '';
+  weatherBadge.hidden = false;
+}
+
+async function loadWeatherFromCache() {
+  try {
+    const raw = await chrome.storage.local.get([WEATHER_CACHE_KEY]);
+    const cached = raw[WEATHER_CACHE_KEY];
+    if (!cached || !cached.data || typeof cached.at !== 'number') return;
+    if (Date.now() - cached.at > WEATHER_CACHE_TTL_MS) return;
+    applyWeatherTheme(wmoToTheme(cached.data.weather_code));
+    renderWeatherBadge(cached.data);
+  } catch { /* ignore */ }
+}
+
+function getLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 8000, maximumAge: 3600000 }
+    );
+  });
+}
+
+async function fetchWeather(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto&temperature_unit=fahrenheit`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Weather fetch failed');
+  const json = await res.json();
+  const cur = json.current;
+  if (!cur) throw new Error('No current weather');
+  return {
+    temperature_2m: cur.temperature_2m,
+    weather_code: cur.weather_code,
+  };
+}
+
+async function loadWeather() {
+  try {
+    const loc = await getLocation();
+    if (!loc) return;
+    const data = await fetchWeather(loc.lat, loc.lon);
+    const themeKey = wmoToTheme(data.weather_code);
+    applyWeatherTheme(themeKey);
+    renderWeatherBadge(data);
+    await chrome.storage.local.set({
+      [WEATHER_CACHE_KEY]: { data, at: Date.now() },
+    });
+  } catch { /* ignore */ }
 }
 
 function migrateLegacyShortcuts() {
@@ -570,8 +687,9 @@ const NOTES_STORAGE_KEY = 'notesContent';
 const NOTES_GOOGLE_DOC_ID_KEY = 'notesGoogleDocId';
 const NOTES_GOOGLE_TOKEN_KEY = 'notesGoogleAccessToken';
 const GOOGLE_OAUTH_SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file';
-// Replace with your OAuth 2.0 Client ID (Chrome application) from Google Cloud Console
-const GOOGLE_OAUTH_CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
+// Google Docs sync: create an OAuth 2.0 Client ID (Chrome app, Application ID = your extension ID from chrome://extensions).
+// Paste the Client ID below (it ends with .apps.googleusercontent.com). See README → Sync notes to Google Docs.
+const GOOGLE_OAUTH_CLIENT_ID = '642641355561-kul5i4np57t0rg676qhfloqqqskdfkoh.apps.googleusercontent.com';
 
 let notesSaveTimer = null;
 
@@ -607,11 +725,17 @@ function bindNotesEvents() {
 
 async function getGoogleAccessToken() {
   if (GOOGLE_OAUTH_CLIENT_ID.startsWith('YOUR_')) {
-    setNotesSyncStatus('Add your Google OAuth client ID in the code (see README)', 'sync-error');
+    setNotesSyncStatus('Paste your Google OAuth Client ID in newtab.js (see README: Sync notes to Google Docs).', 'sync-error');
+    return null;
+  }
+  if (!chrome.identity || typeof chrome.identity.launchWebAuthFlow !== 'function') {
+    setNotesSyncStatus('Sign-in failed: identity API not available. Reload the extension and ensure "identity" is in manifest permissions.', 'sync-error');
     return null;
   }
   try {
-    const redirectUrl = chrome.identity.getRedirectURL();
+    const redirectUrl = (typeof chrome.identity.getRedirectURL === 'function')
+      ? chrome.identity.getRedirectURL()
+      : 'https://' + chrome.runtime.id + '.chromiumapp.org/';
     const authUrl =
       'https://accounts.google.com/o/oauth2/v2/auth?' +
       'client_id=' + encodeURIComponent(GOOGLE_OAUTH_CLIENT_ID) +

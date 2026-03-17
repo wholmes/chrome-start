@@ -1,10 +1,11 @@
 # Start Page
 
-A Chrome extension that replaces the new tab with a minimal, customizable start page—clock, search, shortcuts, notes, and optional sync to Google Docs.
+A Chrome extension that replaces the new tab with a minimal, customizable start page—clock, search, shortcuts, notes, weather-driven visuals, and optional sync to Google Docs.
 
 ## Features
 
 - **Clock & greeting** — Live time and contextual greeting (Good morning / afternoon / evening)
+- **Weather** — Current conditions and temperature (°F) from your location; the background orb and accent colors change with the weather (clear, cloudy, rain, snow, storm, etc.)
 - **Search** — Web search with your choice of engine (Google, DuckDuckGo, Bing, Brave Search)
 - **Shortcuts** — Custom links in a grid with optional SVG icons and accent colors
 - **Groups** — Organize shortcuts into sections (e.g. Work, Personal); add, rename, reorder, or delete groups
@@ -39,6 +40,7 @@ All data is stored locally in the extension and persists across browser restarts
 | **Search** | Type in the search box and press Enter. |
 | **Search engine** | Use the “Search with” dropdown under the search bar. |
 | **Theme** | Use the “Theme” dropdown (System / Light / Dark). |
+| **Weather** | Allow location when prompted; current conditions and temp (°F) appear below the clock and drive the orb/accent colors. Cached for 30 min. |
 | **Add shortcut** | Click “Add shortcut” or the “+” on a group header; set name, URL, optional SVG icon and color. |
 | **Edit shortcut** | Hover a shortcut and click the pencil icon. |
 | **Reorder shortcuts** | Drag a shortcut to another position or into another group. |
@@ -54,7 +56,7 @@ Notes can be pushed to a single Google Doc named **“Start Page Notes”**. Syn
 2. **Enable APIs**: APIs & Services → Library → enable **Google Docs API** and **Google Drive API**.
 3. **Create OAuth client**: APIs & Services → Credentials → Create Credentials → **OAuth client ID**.  
    - Application type: **Chrome application**  
-   - Application ID: your extension ID from `chrome://extensions` (copy from the extension card).
+   - Application ID: `kgciifcaeddohhpemljgbojiadakdapa` (or your extension ID from `chrome://extensions` if different).
 4. Copy the **Client ID** (e.g. `123456789-xxx.apps.googleusercontent.com`).
 5. In the extension folder, open **`newtab.js`** and set:
    ```js
