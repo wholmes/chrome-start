@@ -121,14 +121,15 @@ const WMO_TO_THEME = {
   95: 'storm', 96: 'storm', 99: 'storm',
 };
 
+// Weather icons: one per theme, driven by Open-Meteo WMO code → theme. Clear, recognizable shapes.
 const WEATHER_ICONS = {
-  clear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
-  'partly-cloudy': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/><circle cx="12" cy="12" r="3"/><path d="M18 14a4 4 0 0 0-8 0c0 1.5.8 2.8 2 3.5"/></svg>',
-  cloudy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/></svg>',
-  fog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 14h16M4 18h16M6 10h12M6 6h10"/></svg>',
-  rain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/><path d="M8 19v2M12 19v2M16 19v2M10 21v-4M14 21v-4"/></svg>',
-  snow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/><path d="M12 17v2M12 15l-1.5 1M12 15l1.5 1M12 19l-1.5-1M12 19l1.5-1"/></svg>',
-  storm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 10h-1.26A4 4 0 1 0 9 14h9a3 3 0 0 0 0-4z"/><path d="M13 12l-3 4h4l-3 4"/></svg>',
+  clear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 1v2.5M12 20.5V23M3 12h2.5M18.5 12H21M5.64 5.64l1.77 1.77M16.59 16.59l1.77 1.77M5.64 18.36l1.77-1.77M16.59 7.41l1.77-1.77"/></svg>',
+  'partly-cloudy': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="9" r="2.8"/><path d="M8 4v2M8 14v1.5M4.2 9H6M10 9h1.8M5.5 6.2l1.2 1.2M10.3 11.5l1.2 1.2M5.5 11.8l1.2-1.2M10.3 6.5l1.2-1.2"/><path d="M18 13.5a3.5 3.5 0 0 0-7 0c0 .6.3 1.2.8 1.5H18a1.5 1.5 0 0 0 0-3z" fill="currentColor" fill-opacity="0.15" stroke="currentColor"/></svg>',
+  cloudy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M19 14a4 4 0 0 0-7.2-2.4A4 4 0 1 0 8 16h11a2 2 0 0 0 0-4z"/></svg>',
+  fog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 8h16M4 13h16M4 18h14"/></svg>',
+  rain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M19 14a4 4 0 0 0-7.2-2.4A4 4 0 1 0 8 16h11a2 2 0 0 0 0-4z"/><path d="M8 19v2M12 19v2M16 19v2M10 21v-3M14 21v-3"/></svg>',
+  snow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M19 14a4 4 0 0 0-7.2-2.4A4 4 0 1 0 8 16h11a2 2 0 0 0 0-4z"/><path d="M12 17v1.5M12 15.5l-1 1M12 15.5l1 1M12 18.5l-1-1M12 18.5l1-1M10.5 17h1M14.5 17h1"/></svg>',
+  storm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14a4 4 0 0 0-7.2-2.4A4 4 0 1 0 8 16h11a2 2 0 0 0 0-4z"/><path d="M13 11l-2 3h2l-2 3" stroke-linejoin="miter"/></svg>',
 };
 
 const WEATHER_LABELS = {

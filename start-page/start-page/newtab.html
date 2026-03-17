@@ -17,6 +17,17 @@
 
   <main class="page" id="page">
 
+    <!-- Logo (upper left) -->
+    <header class="logo-bar" id="logoBar">
+      <div class="logo-wrap" id="logoWrap">
+        <!-- Logo SVG injected here or placeholder -->
+      </div>
+      <button type="button" class="logo-edit-btn" id="logoEditBtn" title="Change logo" aria-label="Change logo">
+        <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Change logo
+      </button>
+    </header>
+
     <!-- Top: clock + date + weather -->
     <header class="top">
       <p class="greeting" id="greeting"></p>
@@ -206,6 +217,37 @@
         <div class="foot-actions">
           <button class="btn-ghost" id="groupCancelBtn">Cancel</button>
           <button class="btn-primary" id="groupSaveBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logo modal -->
+  <div class="overlay" id="logoOverlay" role="dialog" aria-modal="true" aria-labelledby="logoModalHeading">
+    <div class="modal modal-sm" id="logoModal">
+      <div class="modal-head">
+        <h2 class="modal-title" id="logoModalHeading">Logo</h2>
+        <button class="icon-btn" id="logoCloseBtn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span class="label">SVG logo</span>
+          <textarea id="fLogoSvg" rows="6" placeholder="Paste your <svg>…</svg> code" spellcheck="false"></textarea>
+        </label>
+        <div class="preview-row">
+          <span class="label">Preview</span>
+          <div class="logo-preview" id="logoPreview"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-danger" id="logoClearBtn">Remove logo</button>
+        <div class="foot-actions">
+          <button class="btn-ghost" id="logoCancelBtn">Cancel</button>
+          <button class="btn-primary" id="logoSaveBtn">Save</button>
         </div>
       </div>
     </div>
