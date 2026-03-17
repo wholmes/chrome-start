@@ -93,6 +93,17 @@ const weatherBadge      = $('weatherBadge');
 const weatherIcon       = $('weatherIcon');
 const weatherTemp       = $('weatherTemp');
 const weatherDesc       = $('weatherDesc');
+const logoWrap          = $('logoWrap');
+const logoEditBtn       = $('logoEditBtn');
+const logoOverlay       = $('logoOverlay');
+const logoCloseBtn      = $('logoCloseBtn');
+const logoCancelBtn     = $('logoCancelBtn');
+const logoSaveBtn       = $('logoSaveBtn');
+const logoClearBtn      = $('logoClearBtn');
+const fLogoSvg          = $('fLogoSvg');
+const logoPreview       = $('logoPreview');
+
+const LOGO_STORAGE_KEY = 'logoSvg';
 
 // ─── Weather (Open-Meteo, no API key) ─────────────────────────────────────────
 const WEATHER_CACHE_KEY = 'weatherCache';
@@ -157,6 +168,7 @@ async function init() {
   applyTheme();
   renderSearchEngineOptions();
   renderThemeSelect();
+  await loadLogo();
   await loadNotes();
   await loadWeatherFromCache();
   loadWeather();
@@ -164,6 +176,7 @@ async function init() {
   bindEvents();
   bindGroupModalEvents();
   bindNotesEvents();
+  bindLogoEvents();
 }
 
 function applyTheme() {
@@ -178,6 +191,90 @@ function applyTheme() {
 
 function renderThemeSelect() {
   themeSelect.value = settings.theme || 'system';
+}
+
+// ─── Logo ───────────────────────────────────────────────────────────────────
+
+let logoSvg = '';
+
+async function loadLogo() {
+  try {
+    const result = await chrome.storage.local.get([LOGO_STORAGE_KEY]);
+    logoSvg = result[LOGO_STORAGE_KEY] || '';
+    renderLogo();
+  } catch { /* dev */ }
+}
+
+function renderLogo() {
+  if (!logoWrap) return;
+  if (logoSvg.trim()) {
+    logoWrap.innerHTML = sanitizeSvg(logoSvg);
+    logoWrap.style.display = '';
+  } else {
+    logoWrap.innerHTML = '';
+    logoWrap.style.display = 'none';
+  }
+}
+
+async function persistLogo() {
+  try {
+    await chrome.storage.local.set({ [LOGO_STORAGE_KEY]: logoSvg });
+  } catch { /* dev */ }
+}
+
+function openLogoModal() {
+  fLogoSvg.value = logoSvg;
+  updateLogoPreview();
+  logoOverlay.classList.add('open');
+  setTimeout(() => fLogoSvg.focus(), 60);
+}
+
+function closeLogoModal() {
+  logoOverlay.classList.remove('open');
+}
+
+function updateLogoPreview() {
+  if (!logoPreview) return;
+  const raw = fLogoSvg.value.trim();
+  if (raw) {
+    logoPreview.innerHTML = sanitizeSvg(raw);
+    logoPreview.style.color = 'var(--text)';
+    const svg = logoPreview.querySelector('svg');
+    if (svg) {
+      svg.style.maxWidth = '100%';
+      svg.style.maxHeight = '100%';
+    }
+  } else {
+    logoPreview.innerHTML = '';
+  }
+}
+
+async function saveLogo() {
+  logoSvg = fLogoSvg.value.trim();
+  await persistLogo();
+  renderLogo();
+  closeLogoModal();
+}
+
+async function clearLogo() {
+  logoSvg = '';
+  fLogoSvg.value = '';
+  await persistLogo();
+  renderLogo();
+  closeLogoModal();
+}
+
+function bindLogoEvents() {
+  if (logoEditBtn) logoEditBtn.addEventListener('click', openLogoModal);
+  if (logoCloseBtn) logoCloseBtn.addEventListener('click', closeLogoModal);
+  if (logoCancelBtn) logoCancelBtn.addEventListener('click', closeLogoModal);
+  if (logoSaveBtn) logoSaveBtn.addEventListener('click', saveLogo);
+  if (logoClearBtn) logoClearBtn.addEventListener('click', clearLogo);
+  if (fLogoSvg) fLogoSvg.addEventListener('input', updateLogoPreview);
+  if (logoOverlay) logoOverlay.addEventListener('click', (e) => { if (e.target === logoOverlay) closeLogoModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && logoOverlay && logoOverlay.classList.contains('open')) closeLogoModal();
+  });
 }
 
 // ─── Weather ─────────────────────────────────────────────────────────────────
@@ -687,9 +784,10 @@ const NOTES_STORAGE_KEY = 'notesContent';
 const NOTES_GOOGLE_DOC_ID_KEY = 'notesGoogleDocId';
 const NOTES_GOOGLE_TOKEN_KEY = 'notesGoogleAccessToken';
 const GOOGLE_OAUTH_SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file';
-// Google Docs sync: create an OAuth 2.0 Client ID (Chrome app, Application ID = your extension ID from chrome://extensions).
+// Google Docs sync: create an OAuth 2.0 Client ID (Chrome app or Web app). Add this redirect URI in the client.
 // Paste the Client ID below (it ends with .apps.googleusercontent.com). See README → Sync notes to Google Docs.
-const GOOGLE_OAUTH_CLIENT_ID = '642641355561-kul5i4np57t0rg676qhfloqqqskdfkoh.apps.googleusercontent.com';
+const GOOGLE_OAUTH_REDIRECT_URI = 'https://kgciifcaeddohhpemljgbojiadakdapa.chromiumapp.org';
+const GOOGLE_OAUTH_CLIENT_ID = '642641355561-55mtt5d770amqedt1okqqoa3fs9e96e5.apps.googleusercontent.com';
 
 let notesSaveTimer = null;
 
@@ -733,9 +831,7 @@ async function getGoogleAccessToken() {
     return null;
   }
   try {
-    const redirectUrl = (typeof chrome.identity.getRedirectURL === 'function')
-      ? chrome.identity.getRedirectURL()
-      : 'https://' + chrome.runtime.id + '.chromiumapp.org/';
+    const redirectUrl = GOOGLE_OAUTH_REDIRECT_URI;
     const authUrl =
       'https://accounts.google.com/o/oauth2/v2/auth?' +
       'client_id=' + encodeURIComponent(GOOGLE_OAUTH_CLIENT_ID) +
@@ -750,6 +846,16 @@ async function getGoogleAccessToken() {
       });
     });
     if (!responseUrl) return null;
+    const urlObj = new URL(responseUrl);
+    const err = urlObj.searchParams.get('error');
+    if (err === 'redirect_uri_mismatch') {
+      setNotesSyncStatus('Redirect URI mismatch. In Google Cloud add this exact Authorized redirect URI: ' + redirectUrl, 'sync-error');
+      return null;
+    }
+    if (err) {
+      setNotesSyncStatus('Sign-in failed: ' + (urlObj.searchParams.get('error_description') || err), 'sync-error');
+      return null;
+    }
     const hash = responseUrl.split('#')[1];
     if (!hash) return null;
     const params = new URLSearchParams(hash);
@@ -827,11 +933,14 @@ async function syncNotesToGoogle() {
     }
     const requests = [];
     if (endIndex > startIndex) {
-      requests.push({
-        deleteContentRange: {
-          range: { startIndex, endIndex },
-        },
-      });
+      const deleteEnd = endIndex - 1;
+      if (deleteEnd > startIndex) {
+        requests.push({
+          deleteContentRange: {
+            range: { startIndex, endIndex: deleteEnd },
+          },
+        });
+      }
     }
     const textToInsert = content + '\n';
     if (textToInsert.length > 0) {
@@ -874,6 +983,7 @@ function exportBackup() {
     groups,
     settings,
     notes: notesText ? notesText.value : '',
+    logoSvg: logoSvg || '',
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -919,6 +1029,11 @@ function restoreFromBackup(file) {
       if (typeof data.notes === 'string' && notesText) {
         notesText.value = data.notes;
         persistNotes();
+      }
+      if (typeof data.logoSvg === 'string') {
+        logoSvg = data.logoSvg;
+        persistLogo();
+        renderLogo();
       }
       persist();
       applyTheme();

@@ -65,6 +65,8 @@ Notes can be pushed to a single Google Doc named **“Start Page Notes”**. Syn
    (Replace the placeholder `YOUR_CLIENT_ID.apps.googleusercontent.com`.)
 6. Reload the extension, then on the start page click **Sync to Google**. Sign in when prompted; a doc will be created and later syncs will update it.
 
+Sync replaces the doc body with your current notes. The update avoids the Docs API restriction that `deleteContentRange` cannot include the newline at the end of a segment by deleting only up to that character, then inserting the new content.
+
 ## License
 
 MIT
