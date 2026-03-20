@@ -2,20 +2,17 @@
   "manifest_version": 3,
   "name": "Start Page",
   "version": "1.0.1",
-  "description": "A minimal, modern custom new tab page with shortcuts and custom SVG icons.",
+  "description": "Replace your new tab with a customizable start page featuring shortcuts, notes, weather, search, and personalized backgrounds.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
-  "permissions": ["storage", "identity", "management"],
+  "permissions": ["storage"],
   "host_permissions": [
-    "https://docs.googleapis.com/*",
-    "https://www.googleapis.com/*",
-    "https://accounts.google.com/*",
     "https://api.open-meteo.com/*",
     "https://api.unsplash.com/*",
     "https://images.unsplash.com/*"
   ],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://images.unsplash.com; script-src 'self'; connect-src 'self' https://docs.googleapis.com https://www.googleapis.com https://accounts.google.com https://api.open-meteo.com https://api.unsplash.com;"
+    "extension_pages": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://images.unsplash.com; script-src 'self'; connect-src 'self' https://api.open-meteo.com https://api.unsplash.com;"
   }
 }
