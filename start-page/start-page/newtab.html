@@ -12,6 +12,9 @@
 </head>
 <body>
 
+  <!-- Background slideshow -->
+  <div class="bg-slideshow" id="bgSlideshow" aria-hidden="true"></div>
+
   <!-- Ambient background orb -->
   <div class="bg-orb"></div>
 
@@ -22,10 +25,16 @@
       <div class="logo-wrap" id="logoWrap">
         <!-- Logo SVG injected here or placeholder -->
       </div>
-      <button type="button" class="logo-edit-btn" id="logoEditBtn" title="Change logo" aria-label="Change logo">
-        <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        Change logo
-      </button>
+      <div class="logo-actions">
+        <button type="button" class="logo-edit-btn" id="bgEditBtn" title="Background slideshow" aria-label="Background slideshow">
+          <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M4 4h16v16H4z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 8h16M4 12h16M4 16h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Background
+        </button>
+        <button type="button" class="logo-edit-btn" id="logoEditBtn" title="Change logo" aria-label="Change logo">
+          <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Logo
+        </button>
+      </div>
     </header>
 
     <!-- Top: clock + date + weather -->
@@ -76,7 +85,14 @@
     <!-- Notes -->
     <section class="notes-section" id="notesSection">
       <div class="notes-header">
-        <h3 class="notes-title">Notes</h3>
+        <div class="notes-title-row">
+          <h3 class="notes-title">Notes</h3>
+          <button type="button" class="notes-toggle" id="notesToggle" title="Hide notes" aria-label="Toggle notes visibility" aria-expanded="true">
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
         <div class="notes-sync-row">
           <span class="notes-sync-status" id="notesSyncStatus" aria-live="polite"></span>
           <button type="button" class="add-fab add-fab-sm" id="notesSyncBtn" title="Sync to Google Docs">
@@ -84,13 +100,15 @@
           </button>
         </div>
       </div>
-      <textarea
-        id="notesText"
-        class="notes-textarea"
-        placeholder="Quick notes… (synced to Google Docs when you click Sync)"
-        rows="4"
-        spellcheck="true"
-      ></textarea>
+      <div class="notes-content" id="notesContent">
+        <textarea
+          id="notesText"
+          class="notes-textarea"
+          placeholder="Quick notes… (synced to Google Docs when you click Sync)"
+          rows="4"
+          spellcheck="true"
+        ></textarea>
+      </div>
     </section>
 
     <!-- Shortcuts by group -->
@@ -121,9 +139,8 @@
     </section>
 
     <footer class="page-footer" role="contentinfo">
-      <p class="footer-copyright">© 2025 Whittfield Holmes</p>
+      <p class="footer-copyright">© <span id="copyrightYear"></span> Chrome Start by Whittfield Holmes</p>
     </footer>
-
   </main>
 
   <!-- Modal overlay -->
@@ -251,6 +268,116 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Background slideshow settings modal -->
+  <div class="overlay" id="bgOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 class="modal-heading" id="bgModalHeading">Background Slideshow</h2>
+        <button class="icon-btn" id="bgCloseBtn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <span class="label">Add image</span>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <input type="file" id="bgImageInput" accept="image/*" multiple style="display: none;">
+            <button type="button" class="btn-ghost" id="bgAddBtn" style="flex: 1;">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16" style="margin-right: 6px;"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Upload
+            </button>
+            <button type="button" class="btn-ghost" id="bgUnsplashBtn" style="flex: 1;">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16" style="margin-right: 6px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
+              Unsplash
+            </button>
+          </div>
+        </div>
+        <div class="field" style="margin-top: 20px;">
+          <span class="label">Transition</span>
+          <select id="bgTransition">
+            <option value="fade">Fade</option>
+            <option value="crossfade">Crossfade</option>
+            <option value="zoom">Zoom fade</option>
+            <option value="slide">Slide</option>
+            <option value="blur">Blur fade</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top: 16px;">
+          <span class="label">Duration (seconds)</span>
+          <input type="number" id="bgDuration" min="3" max="60" value="8" step="1">
+        </div>
+        <div class="field" style="margin-top: 16px;">
+          <span class="label">Transition speed (seconds)</span>
+          <input type="number" id="bgTransitionSpeed" min="0.5" max="5" value="2" step="0.5">
+        </div>
+        <div class="field" style="margin-top: 20px;">
+          <span class="label">Images</span>
+          <div id="bgImageList" class="bg-image-list"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-danger" id="bgClearBtn">Clear all</button>
+        <div class="foot-actions">
+          <button class="btn-ghost" id="bgCancelBtn">Cancel</button>
+          <button class="btn-primary" id="bgSaveBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unsplash browser modal -->
+  <div class="overlay" id="unsplashOverlay">
+    <div class="modal" style="max-width: 900px;">
+      <div class="modal-head">
+        <h2 class="modal-heading" id="unsplashModalHeading">Browse Unsplash Photos</h2>
+        <button class="icon-btn" id="unsplashCloseBtn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <span class="label">Unsplash API Key</span>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <input type="password" id="unsplashApiKey" placeholder="Your Unsplash API key" style="flex: 1;" autocomplete="off">
+            <button type="button" class="btn-primary" id="unsplashApiKeySave">Save</button>
+          </div>
+          <p style="font-size: 11px; color: var(--muted); margin-top: 6px;">
+            <a href="https://unsplash.com/developers" target="_blank" style="color: var(--accent); text-decoration: none;">Get your free API key</a> from Unsplash (no credit card required)
+          </p>
+        </div>
+        <div class="field" style="margin-top: 20px;">
+          <span class="label">Search Unsplash</span>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <input type="text" id="unsplashSearch" placeholder="Search photos (e.g., nature, mountains, city)" style="flex: 1;">
+            <button type="button" class="btn-primary" id="unsplashSearchBtn">Search</button>
+          </div>
+        </div>
+        <div id="unsplashLoading" style="display: none; text-align: center; padding: 40px; color: var(--muted);">
+          <p>Loading photos...</p>
+        </div>
+        <div id="unsplashError" style="display: none; text-align: center; padding: 20px; color: var(--danger); font-size: 13px;"></div>
+        <div id="unsplashGrid" class="unsplash-grid"></div>
+      </div>
+      <div class="modal-foot">
+        <div class="foot-actions" style="width: 100%;">
+          <button class="btn-ghost" id="unsplashCancelBtn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo credit (Unsplash: photographer + photo page links) -->
+  <div class="photo-credit" id="photoCredit" aria-hidden="true">
+    <p class="photo-credit-line">
+      Photo by <a id="photoCreditAuthor" href="#" target="_blank" rel="noopener noreferrer" class="photo-credit-author"></a>
+      on <a id="photoCreditPhotoPage" href="#" target="_blank" rel="noopener noreferrer" class="photo-credit-unsplash">Unsplash</a>
+    </p>
   </div>
 
   <script src="newtab.js"></script>

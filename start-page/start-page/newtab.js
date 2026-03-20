@@ -89,6 +89,9 @@ const restoreInput      = $('restoreInput');
 const notesText         = $('notesText');
 const notesSyncBtn      = $('notesSyncBtn');
 const notesSyncStatus   = $('notesSyncStatus');
+const notesSection      = $('notesSection');
+const notesToggle       = $('notesToggle');
+const notesContent       = $('notesContent');
 const weatherBadge      = $('weatherBadge');
 const weatherIcon       = $('weatherIcon');
 const weatherTemp       = $('weatherTemp');
@@ -102,8 +105,54 @@ const logoSaveBtn       = $('logoSaveBtn');
 const logoClearBtn      = $('logoClearBtn');
 const fLogoSvg          = $('fLogoSvg');
 const logoPreview       = $('logoPreview');
+const bgSlideshow       = $('bgSlideshow');
+const bgEditBtn         = $('bgEditBtn');
+const bgOverlay         = $('bgOverlay');
+const bgCloseBtn        = $('bgCloseBtn');
+const bgCancelBtn       = $('bgCancelBtn');
+const bgSaveBtn         = $('bgSaveBtn');
+const bgClearBtn        = $('bgClearBtn');
+const bgImageInput      = $('bgImageInput');
+const bgAddBtn          = $('bgAddBtn');
+const bgImageList       = $('bgImageList');
+const bgTransition       = $('bgTransition');
+const bgDuration        = $('bgDuration');
+const bgTransitionSpeed = $('bgTransitionSpeed');
+const bgUnsplashBtn      = $('bgUnsplashBtn');
+const unsplashOverlay    = $('unsplashOverlay');
+const unsplashCloseBtn   = $('unsplashCloseBtn');
+const unsplashCancelBtn  = $('unsplashCancelBtn');
+const unsplashSearch     = $('unsplashSearch');
+const unsplashSearchBtn  = $('unsplashSearchBtn');
+const unsplashGrid       = $('unsplashGrid');
+const unsplashLoading    = $('unsplashLoading');
+const unsplashError      = $('unsplashError');
+const unsplashApiKeyInput = $('unsplashApiKey');
+const unsplashApiKeySave = $('unsplashApiKeySave');
+const photoCredit         = $('photoCredit');
+const photoCreditAuthor   = $('photoCreditAuthor');
+const photoCreditPhotoPage = $('photoCreditPhotoPage');
 
 const LOGO_STORAGE_KEY = 'logoSvg';
+const BG_STORAGE_KEY = 'bgSlideshow';
+const BG_DEFAULT_DURATION = 8;
+const BG_DEFAULT_TRANSITION = 'fade';
+const BG_DEFAULT_TRANSITION_SPEED = 2;
+const UNSPLASH_API_KEY_STORAGE_KEY = 'unsplashApiKey';
+const UNSPLASH_API_BASE = 'https://api.unsplash.com';
+
+/**
+ * Unsplash API application screenshot: set to `true`, reload the extension, open a new tab,
+ * capture your screenshot, then set back to `false`. Uses unsplash-demo-screenshot.png + credit.
+ */
+const UNSPLASH_SCREENSHOT_DEMO = false;
+
+const UNSPLASH_DEMO_ATTRIBUTION = {
+  name: 'Martina Nette',
+  username: 'dalmartina',
+  link: 'https://unsplash.com/@dalmartina?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText',
+  photoPageUrl: 'https://unsplash.com/photos/misty-evergreen-forest-on-a-foggy-day-uBjBr9CvNiw?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText',
+};
 
 // ─── Weather (Open-Meteo, no API key) ─────────────────────────────────────────
 const WEATHER_CACHE_KEY = 'weatherCache';
@@ -148,6 +197,7 @@ async function init() {
   renderSwatches();
   startClock();
   updateMeta();
+  updateCopyrightYear();
 
   try {
     const result = await chrome.storage.local.get(['shortcuts', 'groups', 'settings']);
@@ -171,13 +221,20 @@ async function init() {
   renderThemeSelect();
   await loadLogo();
   await loadNotes();
+  await loadNotesVisibility();
   await loadWeatherFromCache();
   loadWeather();
+  await loadUnsplashApiKey();
+  await loadBackgroundSlideshow();
+  if (UNSPLASH_SCREENSHOT_DEMO) {
+    applyUnsplashScreenshotDemo();
+  }
   renderGroups();
   bindEvents();
   bindGroupModalEvents();
   bindNotesEvents();
   bindLogoEvents();
+  bindBackgroundEvents();
 }
 
 function applyTheme() {
@@ -275,6 +332,686 @@ function bindLogoEvents() {
   if (logoOverlay) logoOverlay.addEventListener('click', (e) => { if (e.target === logoOverlay) closeLogoModal(); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && logoOverlay && logoOverlay.classList.contains('open')) closeLogoModal();
+  });
+}
+
+// ─── Background Slideshow ───────────────────────────────────────────────────
+
+let bgSlideshowData = {
+  images: [], // Array of { url, attribution: { name, username, link } }
+  transition: BG_DEFAULT_TRANSITION,
+  duration: BG_DEFAULT_DURATION,
+  transitionSpeed: BG_DEFAULT_TRANSITION_SPEED,
+};
+let bgSlideshowInterval = null;
+let bgCurrentIndex = 0;
+let bgEditingImages = []; // Array of { url, attribution }
+
+async function loadBackgroundSlideshow() {
+  try {
+    const result = await chrome.storage.local.get([BG_STORAGE_KEY]);
+    const stored = result[BG_STORAGE_KEY];
+    if (stored && Array.isArray(stored.images)) {
+      // Convert old string format to new object format for backward compatibility
+      const images = stored.images.map(item => {
+        if (typeof item === 'string') {
+          return { url: item, attribution: null };
+        }
+        return item;
+      });
+      bgSlideshowData = {
+        images,
+        transition: stored.transition || BG_DEFAULT_TRANSITION,
+        duration: stored.duration || BG_DEFAULT_DURATION,
+        transitionSpeed: stored.transitionSpeed || BG_DEFAULT_TRANSITION_SPEED,
+      };
+    }
+    renderBackgroundSlideshow();
+    startBackgroundSlideshow();
+  } catch { /* ignore */ }
+}
+
+async function persistBackgroundSlideshow() {
+  try {
+    await chrome.storage.local.set({ [BG_STORAGE_KEY]: bgSlideshowData });
+  } catch { /* ignore */ }
+}
+
+function renderBackgroundSlideshow() {
+  if (!bgSlideshow) return;
+  bgSlideshow.innerHTML = '';
+  const images = bgSlideshowData.images || [];
+  if (images.length === 0) {
+    bgSlideshow.style.display = 'none';
+    document.body.style.background = 'var(--bg)';
+    document.documentElement.removeAttribute('data-bg-bright');
+    hidePhotoCredit();
+    return;
+  }
+  bgSlideshow.style.display = 'block';
+  bgSlideshow.style.visibility = 'visible';
+  // Make body background transparent so slideshow shows through
+  document.body.style.background = 'transparent';
+  bgSlideshow.setAttribute('data-transition', bgSlideshowData.transition);
+  bgSlideshow.style.setProperty('--bg-transition-speed', `${bgSlideshowData.transitionSpeed}s`);
+  images.forEach((item, i) => {
+    const img = document.createElement('img');
+    const imageUrl = typeof item === 'string' ? item : item.url;
+    img.src = imageUrl;
+    img.className = 'bg-slide';
+    if (i === bgCurrentIndex) {
+      img.classList.add('active');
+      // Force first image to be visible immediately
+      img.style.opacity = '1';
+      img.style.transition = 'none';
+      setTimeout(() => {
+        img.style.transition = '';
+      }, 100);
+      showPhotoCredit(typeof item === 'object' && item.attribution ? item.attribution : null);
+      // Analyze brightness of current image
+      img.onload = async () => {
+        const brightness = await analyzeImageBrightness(imageUrl);
+        updateTextColorForImage(brightness);
+      };
+    }
+    if (i === (bgCurrentIndex + 1) % images.length) img.classList.add('next');
+    bgSlideshow.appendChild(img);
+  });
+}
+
+// ─── Image Brightness Detection ────────────────────────────────────────────
+
+async function analyzeImageBrightness(imageUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    // Only set crossOrigin for external URLs (not data URLs)
+    if (!imageUrl.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        // Limit canvas size for performance (max 500px)
+        const maxSize = 500;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxSize || height > maxSize) {
+          const ratio = Math.min(maxSize / width, maxSize / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Sample pixels (every 10th pixel for performance)
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        let totalBrightness = 0;
+        let sampleCount = 0;
+        
+        // Sample pixels in a grid pattern for better performance
+        const step = 10;
+        for (let i = 0; i < data.length; i += 4 * step) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          // Calculate relative luminance (perceived brightness)
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          totalBrightness += luminance;
+          sampleCount++;
+        }
+        
+        const avgBrightness = totalBrightness / sampleCount;
+        console.log('Image brightness calculated:', avgBrightness);
+        resolve(avgBrightness);
+      } catch (e) {
+        console.error('Error analyzing image (CORS or other):', e);
+        // If CORS error, try to estimate from the image element itself
+        // This is a fallback that won't work for all cases
+        resolve(0.5); // Default to medium brightness
+      }
+    };
+    img.onerror = (e) => {
+      console.warn('Image failed to load for brightness analysis:', e);
+      resolve(0.5); // Default to medium brightness on error
+    };
+    img.src = imageUrl;
+  });
+}
+
+function updateTextColorForImage(brightness) {
+  // If brightness > 0.5, image is light, use dark text
+  // If brightness < 0.5, image is dark, use light text
+  const root = document.documentElement;
+  if (brightness > 0.5) {
+    root.setAttribute('data-bg-bright', 'light');
+  } else {
+    root.setAttribute('data-bg-bright', 'dark');
+  }
+}
+
+function previewBackgroundSlideshow() {
+  if (!bgSlideshow) {
+    console.error('bgSlideshow element not found');
+    return;
+  }
+  // Temporarily use editing images for preview
+  const previewImages = bgEditingImages.map(item => {
+    if (typeof item === 'string') {
+      return { url: item, attribution: null };
+    }
+    return item;
+  });
+  console.log('Preview function called with', previewImages.length, 'images');
+  if (previewImages.length === 0) {
+    bgSlideshow.style.display = 'none';
+    document.body.style.background = 'var(--bg)';
+    document.documentElement.removeAttribute('data-bg-bright');
+    hidePhotoCredit();
+    return;
+  }
+  bgSlideshow.innerHTML = '';
+  bgSlideshow.style.display = 'block';
+  bgSlideshow.style.visibility = 'visible';
+  // Make body background transparent so slideshow shows through
+  document.body.style.background = 'transparent';
+  const transition = bgTransition?.value || bgSlideshowData.transition || BG_DEFAULT_TRANSITION;
+  const speed = bgTransitionSpeed?.value || bgSlideshowData.transitionSpeed || BG_DEFAULT_TRANSITION_SPEED;
+  bgSlideshow.setAttribute('data-transition', transition);
+  bgSlideshow.style.setProperty('--bg-transition-speed', `${speed}s`);
+  
+  previewImages.forEach((item, i) => {
+    const img = document.createElement('img');
+    img.className = 'bg-slide';
+    
+    // Ensure first image is immediately visible
+    if (i === 0) {
+      img.classList.add('active');
+      // Force opacity and visibility immediately
+      img.style.opacity = '1';
+      img.style.visibility = 'visible';
+      img.style.transition = 'none';
+      img.style.zIndex = '1';
+      showPhotoCredit(item.attribution);
+      
+      img.onload = async () => {
+        console.log('First image loaded, ensuring visibility');
+        img.style.opacity = '1';
+        img.style.visibility = 'visible';
+        // Analyze brightness and update text color
+        const brightness = await analyzeImageBrightness(item.url);
+        console.log('Image brightness:', brightness);
+        updateTextColorForImage(brightness);
+      };
+    } else {
+      img.classList.add('next');
+    }
+    
+    // Set src after setting up event handlers
+    img.src = item.url;
+    bgSlideshow.appendChild(img);
+    
+    // Force a reflow to ensure styles apply
+    if (i === 0) {
+      img.offsetHeight; // trigger reflow
+      const computed = window.getComputedStyle(img);
+      console.log('Image element created:', {
+        opacity: computed.opacity,
+        visibility: computed.visibility,
+        display: computed.display,
+        zIndex: computed.zIndex,
+        src: img.src.substring(0, 50) + '...'
+      });
+      
+      // Double-check visibility after a moment
+      setTimeout(() => {
+        const check = window.getComputedStyle(img);
+        console.log('After timeout check:', {
+          opacity: check.opacity,
+          visibility: check.visibility,
+          display: check.display
+        });
+        if (check.opacity === '0' || check.visibility === 'hidden') {
+          console.warn('Image is still hidden! Forcing visibility...');
+          img.style.setProperty('opacity', '1', 'important');
+          img.style.setProperty('visibility', 'visible', 'important');
+        }
+      }, 200);
+    }
+  });
+  console.log('Slideshow rendered with', previewImages.length, 'images');
+  console.log('bgSlideshow element:', {
+    display: window.getComputedStyle(bgSlideshow).display,
+    visibility: window.getComputedStyle(bgSlideshow).visibility,
+    zIndex: window.getComputedStyle(bgSlideshow).zIndex
+  });
+}
+
+function startBackgroundSlideshow() {
+  if (bgSlideshowInterval) clearInterval(bgSlideshowInterval);
+  if (!bgSlideshowData.images || bgSlideshowData.images.length <= 1) return;
+  bgSlideshowInterval = setInterval(() => {
+    nextBackgroundSlide();
+  }, bgSlideshowData.duration * 1000);
+}
+
+async function nextBackgroundSlide() {
+  if (!bgSlideshow || !bgSlideshowData.images || bgSlideshowData.images.length === 0) return;
+  const slides = bgSlideshow.querySelectorAll('.bg-slide');
+  if (slides.length === 0) return;
+  const prevIndex = bgCurrentIndex;
+  bgCurrentIndex = (bgCurrentIndex + 1) % bgSlideshowData.images.length;
+  const nextIndex = (bgCurrentIndex + 1) % bgSlideshowData.images.length;
+  slides[prevIndex]?.classList.remove('active', 'next');
+  slides[bgCurrentIndex]?.classList.add('active');
+  if (bgSlideshowData.transition === 'crossfade') {
+    slides[bgCurrentIndex]?.classList.remove('next');
+  }
+  slides[nextIndex]?.classList.add('next');
+  if (bgSlideshowData.transition === 'crossfade') {
+    slides[nextIndex]?.classList.remove('active');
+  }
+  // Update photo credit
+  const currentItem = bgSlideshowData.images[bgCurrentIndex];
+  showPhotoCredit(currentItem && typeof currentItem === 'object' && currentItem.attribution ? currentItem.attribution : null);
+  // Analyze new image brightness
+  const currentImage = slides[bgCurrentIndex];
+  if (currentImage && currentImage.src) {
+    const brightness = await analyzeImageBrightness(currentImage.src);
+    updateTextColorForImage(brightness);
+  }
+}
+
+function openBackgroundModal() {
+  if (!bgOverlay) return;
+  // Ensure images are in object format
+  bgEditingImages = (bgSlideshowData.images || []).map(item => {
+    if (typeof item === 'string') {
+      return { url: item, attribution: null };
+    }
+    return item;
+  });
+  bgTransition.value = bgSlideshowData.transition;
+  bgDuration.value = bgSlideshowData.duration;
+  bgTransitionSpeed.value = bgSlideshowData.transitionSpeed;
+  renderBackgroundImageList();
+  // Show preview of existing images when modal opens
+  if (bgEditingImages.length > 0) {
+    previewBackgroundSlideshow();
+  }
+  bgOverlay.classList.add('open');
+  setTimeout(() => bgImageInput?.focus(), 60);
+}
+
+function closeBackgroundModal() {
+  if (bgOverlay) bgOverlay.classList.remove('open');
+  // Restore original slideshow when modal closes (unless saved)
+  renderBackgroundSlideshow();
+  startBackgroundSlideshow();
+}
+
+function renderBackgroundImageList() {
+  if (!bgImageList) return;
+  bgImageList.innerHTML = '';
+  if (bgEditingImages.length === 0) {
+    bgImageList.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">No images added yet</p>';
+    return;
+  }
+  bgEditingImages.forEach((item, i) => {
+    const url = typeof item === 'string' ? item : item.url;
+    const itemEl = document.createElement('div');
+    itemEl.className = 'bg-image-item';
+    if (i === bgCurrentIndex) itemEl.classList.add('active');
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = `Background ${i + 1}`;
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'bg-image-item-remove';
+    removeBtn.type = 'button';
+    removeBtn.title = 'Remove';
+    removeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bgEditingImages.splice(i, 1);
+      renderBackgroundImageList();
+      previewBackgroundSlideshow();
+    });
+    itemEl.appendChild(img);
+    itemEl.appendChild(removeBtn);
+    bgImageList.appendChild(itemEl);
+  });
+}
+
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleBackgroundImageAdd() {
+  if (!bgImageInput) return;
+  const files = bgImageInput.files;
+  if (!files || files.length === 0) return;
+  try {
+    console.log('Loading', files.length, 'file(s)');
+    const promises = Array.from(files).map(fileToDataURL);
+    const dataUrls = await Promise.all(promises);
+    console.log('Loaded', dataUrls.length, 'image(s)');
+    // Convert to objects for consistency
+    const newImages = dataUrls.map(url => ({ url, attribution: null }));
+    bgEditingImages.push(...newImages);
+    console.log('Added images, total:', bgEditingImages.length);
+    renderBackgroundImageList();
+    bgImageInput.value = '';
+    // Preview immediately - use setTimeout to ensure DOM updates
+    setTimeout(() => {
+      previewBackgroundSlideshow();
+    }, 50);
+  } catch (e) {
+    console.error('Failed to load images:', e);
+    alert('Failed to load images. Please try again.');
+  }
+}
+
+async function saveBackgroundSettings() {
+  // Ensure images are in object format
+  bgSlideshowData.images = bgEditingImages.map(item => {
+    if (typeof item === 'string') {
+      return { url: item, attribution: null };
+    }
+    return item;
+  });
+  bgSlideshowData.transition = bgTransition.value || BG_DEFAULT_TRANSITION;
+  bgSlideshowData.duration = Number(bgDuration.value) || BG_DEFAULT_DURATION;
+  bgSlideshowData.transitionSpeed = Number(bgTransitionSpeed.value) || BG_DEFAULT_TRANSITION_SPEED;
+  await persistBackgroundSlideshow();
+  bgCurrentIndex = 0;
+  console.log('Saving slideshow with', bgSlideshowData.images.length, 'images');
+  renderBackgroundSlideshow();
+  startBackgroundSlideshow();
+  closeBackgroundModal();
+}
+
+async function clearBackgroundSlideshow() {
+  if (!confirm('Remove all background images?')) return;
+  bgSlideshowData.images = [];
+  await persistBackgroundSlideshow();
+  bgCurrentIndex = 0;
+  renderBackgroundSlideshow();
+  startBackgroundSlideshow();
+  closeBackgroundModal();
+}
+
+// ─── Photo Credit Display ───────────────────────────────────────────────────
+
+function showPhotoCredit(attribution) {
+  if (!photoCredit || !photoCreditAuthor || !photoCreditPhotoPage) return;
+  if (!attribution || !attribution.name) {
+    hidePhotoCredit();
+    return;
+  }
+  photoCreditAuthor.textContent = attribution.name;
+  photoCreditAuthor.href = attribution.link || `https://unsplash.com/@${attribution.username || ''}`;
+  photoCreditPhotoPage.href = attribution.photoPageUrl
+    || 'https://unsplash.com/?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText';
+  photoCredit.classList.add('visible');
+  photoCredit.setAttribute('aria-hidden', 'false');
+}
+
+function hidePhotoCredit() {
+  if (photoCredit) {
+    photoCredit.classList.remove('visible');
+    photoCredit.setAttribute('aria-hidden', 'true');
+  }
+}
+
+/** In-memory demo for Unsplash API application screenshot (not saved to storage). */
+function applyUnsplashScreenshotDemo() {
+  if (!UNSPLASH_SCREENSHOT_DEMO || !bgSlideshow) return;
+  const demoUrl = chrome.runtime.getURL('unsplash-demo-screenshot.png');
+  bgSlideshowData.images = [{
+    url: demoUrl,
+    attribution: { ...UNSPLASH_DEMO_ATTRIBUTION },
+  }];
+  bgSlideshowData.transition = BG_DEFAULT_TRANSITION;
+  bgSlideshowData.duration = BG_DEFAULT_DURATION;
+  bgSlideshowData.transitionSpeed = BG_DEFAULT_TRANSITION_SPEED;
+  bgCurrentIndex = 0;
+  document.body.style.background = 'transparent';
+  renderBackgroundSlideshow();
+  startBackgroundSlideshow();
+  analyzeImageBrightness(demoUrl).then(updateTextColorForImage);
+}
+
+// ─── Unsplash API ───────────────────────────────────────────────────────────
+
+let unsplashApiKey = '';
+
+async function loadUnsplashApiKey() {
+  try {
+    const result = await chrome.storage.local.get([UNSPLASH_API_KEY_STORAGE_KEY]);
+    const key = result[UNSPLASH_API_KEY_STORAGE_KEY] || '';
+    unsplashApiKey = key;
+    if (unsplashApiKeyInput && key) {
+      unsplashApiKeyInput.value = key;
+    }
+  } catch { /* ignore */ }
+}
+
+async function saveUnsplashApiKey(key) {
+  try {
+    unsplashApiKey = key.trim();
+    await chrome.storage.local.set({ [UNSPLASH_API_KEY_STORAGE_KEY]: unsplashApiKey });
+  } catch { /* ignore */ }
+}
+
+async function searchUnsplash(query = '', page = 1) {
+  if (!unsplashApiKey) {
+    if (unsplashError) {
+      unsplashError.style.display = 'block';
+      unsplashError.textContent = 'Unsplash API key not set. Click "Get your free API key" link to get one.';
+    }
+    return [];
+  }
+  try {
+    const url = query
+      ? `${UNSPLASH_API_BASE}/search/photos?query=${encodeURIComponent(query)}&per_page=20&page=${page}`
+      : `${UNSPLASH_API_BASE}/photos/random?count=20`;
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Client-ID ${unsplashApiKey}`,
+      },
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        if (unsplashError) {
+          unsplashError.style.display = 'block';
+          unsplashError.textContent = 'Invalid API key. Please check your Unsplash API key.';
+        }
+      } else {
+        throw new Error(`Unsplash API error: ${res.status}`);
+      }
+      return [];
+    }
+    const data = await res.json();
+    if (unsplashError) unsplashError.style.display = 'none';
+    return query ? data.results : data;
+  } catch (e) {
+    console.error('Unsplash API error:', e);
+    if (unsplashError) {
+      unsplashError.style.display = 'block';
+      unsplashError.textContent = `Error: ${e.message}`;
+    }
+    return [];
+  }
+}
+
+function renderUnsplashGrid(photos) {
+  if (!unsplashGrid) return;
+  unsplashGrid.innerHTML = '';
+  if (photos.length === 0) {
+    unsplashGrid.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px; grid-column: 1 / -1;">No photos found</p>';
+    return;
+  }
+  photos.forEach((photo) => {
+    const item = document.createElement('div');
+    item.className = 'unsplash-item';
+    const img = document.createElement('img');
+    img.src = photo.urls.thumb || photo.urls.small;
+    img.alt = photo.description || photo.alt_description || 'Unsplash photo';
+    img.loading = 'lazy';
+    const overlay = document.createElement('div');
+    overlay.className = 'unsplash-item-overlay';
+    overlay.innerHTML = `<strong>${photo.user.name || 'Unknown'}</strong>`;
+    const addBtn = document.createElement('button');
+    addBtn.className = 'unsplash-item-add';
+    addBtn.type = 'button';
+    addBtn.title = 'Add to slideshow';
+    addBtn.setAttribute('aria-label', 'Add photo to slideshow');
+    addBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+    // Also make the item itself clickable as a fallback
+    item.addEventListener('click', async (e) => {
+      // Only trigger if clicking the item itself, not the button (button handles its own click)
+      if (e.target === item || e.target === img || e.target === overlay) {
+        addBtn.click();
+      }
+    });
+    addBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      try {
+        // Ensure bgEditingImages is initialized
+        if (!bgEditingImages) {
+          bgEditingImages = [];
+        }
+        // Use regular size for better quality
+        const imageUrl = photo.urls.regular || photo.urls.full;
+        if (!imageUrl) {
+          console.error('No image URL available');
+          return;
+        }
+        const attribution = {
+          name: photo.user.name,
+          username: photo.user.username,
+          link: photo.user.links?.html || `https://unsplash.com/@${photo.user.username}`,
+          photoPageUrl: photo.links?.html || `https://unsplash.com/photos/${photo.id}`,
+        };
+        bgEditingImages.push({ url: imageUrl, attribution });
+        console.log('Added Unsplash photo, total images:', bgEditingImages.length);
+        // Update the background modal's image list if it's open
+        if (bgImageList) {
+          renderBackgroundImageList();
+        }
+        // Show preview immediately
+        previewBackgroundSlideshow();
+        // Visual feedback
+        addBtn.classList.add('selected');
+        setTimeout(() => addBtn.classList.remove('selected'), 1000);
+      } catch (err) {
+        console.error('Failed to add photo:', err);
+        alert('Failed to add photo. Check console for details.');
+      }
+    });
+    item.appendChild(img);
+    item.appendChild(overlay);
+    item.appendChild(addBtn);
+    unsplashGrid.appendChild(item);
+  });
+}
+
+async function handleUnsplashSearch() {
+  if (!unsplashSearch || !unsplashGrid || !unsplashLoading) return;
+  const query = unsplashSearch.value.trim();
+  unsplashLoading.style.display = 'block';
+  unsplashError.style.display = 'none';
+  unsplashGrid.innerHTML = '';
+  try {
+    const photos = await searchUnsplash(query || 'nature');
+    renderUnsplashGrid(photos);
+  } finally {
+    unsplashLoading.style.display = 'none';
+  }
+}
+
+async function openUnsplashModal() {
+  if (!unsplashOverlay) return;
+  await loadUnsplashApiKey();
+  // Ensure bgEditingImages is initialized from saved data
+  if (bgEditingImages.length === 0) {
+    bgEditingImages = (bgSlideshowData.images || []).map(item => {
+      if (typeof item === 'string') {
+        return { url: item, attribution: null };
+      }
+      return item;
+    });
+  }
+  if (unsplashApiKeyInput && unsplashApiKey) {
+    unsplashApiKeyInput.value = unsplashApiKey;
+  }
+  unsplashOverlay.classList.add('open');
+  if (unsplashSearch) {
+    unsplashSearch.value = '';
+    if (unsplashApiKey) {
+      setTimeout(() => unsplashSearch.focus(), 60);
+    } else {
+      setTimeout(() => unsplashApiKeyInput?.focus(), 60);
+    }
+  }
+  if (unsplashApiKey) {
+    handleUnsplashSearch();
+  }
+}
+
+function closeUnsplashModal() {
+  if (unsplashOverlay) unsplashOverlay.classList.remove('open');
+}
+
+function bindBackgroundEvents() {
+  if (bgEditBtn) bgEditBtn.addEventListener('click', openBackgroundModal);
+  if (bgCloseBtn) bgCloseBtn.addEventListener('click', closeBackgroundModal);
+  if (bgCancelBtn) bgCancelBtn.addEventListener('click', closeBackgroundModal);
+  if (bgSaveBtn) bgSaveBtn.addEventListener('click', saveBackgroundSettings);
+  if (bgClearBtn) bgClearBtn.addEventListener('click', clearBackgroundSlideshow);
+  if (bgAddBtn) bgAddBtn.addEventListener('click', () => bgImageInput?.click());
+  if (bgImageInput) bgImageInput.addEventListener('change', handleBackgroundImageAdd);
+  if (bgUnsplashBtn) bgUnsplashBtn.addEventListener('click', openUnsplashModal);
+  if (bgOverlay) bgOverlay.addEventListener('click', (e) => { if (e.target === bgOverlay) closeBackgroundModal(); });
+  if (unsplashSearchBtn) unsplashSearchBtn.addEventListener('click', handleUnsplashSearch);
+  if (unsplashSearch) {
+    unsplashSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleUnsplashSearch();
+    });
+  }
+  if (unsplashApiKeySave) {
+    unsplashApiKeySave.addEventListener('click', async () => {
+      if (unsplashApiKeyInput) {
+        await saveUnsplashApiKey(unsplashApiKeyInput.value);
+        if (unsplashError) unsplashError.style.display = 'none';
+        handleUnsplashSearch();
+      }
+    });
+  }
+  if (unsplashApiKeyInput) {
+    unsplashApiKeyInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        unsplashApiKeySave?.click();
+      }
+    });
+  }
+  if (unsplashCloseBtn) unsplashCloseBtn.addEventListener('click', closeUnsplashModal);
+  if (unsplashCancelBtn) unsplashCancelBtn.addEventListener('click', closeUnsplashModal);
+  if (unsplashOverlay) unsplashOverlay.addEventListener('click', (e) => { if (e.target === unsplashOverlay) closeUnsplashModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (bgOverlay && bgOverlay.classList.contains('open')) closeBackgroundModal();
+      if (unsplashOverlay && unsplashOverlay.classList.contains('open')) closeUnsplashModal();
+    }
   });
 }
 
@@ -395,6 +1132,13 @@ function updateMeta() {
 
   const opts = { weekday: 'long', month: 'long', day: 'numeric' };
   $('dateStr').textContent = new Date().toLocaleDateString('en-US', opts);
+}
+
+function updateCopyrightYear() {
+  const yearEl = document.getElementById('copyrightYear');
+  if (yearEl) {
+    yearEl.textContent = new Date().getFullYear();
+  }
 }
 
 function getSearchUrl(query) {
@@ -784,6 +1528,7 @@ async function persist() {
 const NOTES_STORAGE_KEY = 'notesContent';
 const NOTES_GOOGLE_DOC_ID_KEY = 'notesGoogleDocId';
 const NOTES_GOOGLE_TOKEN_KEY = 'notesGoogleAccessToken';
+const NOTES_VISIBLE_KEY = 'notesVisible';
 const GOOGLE_OAUTH_SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file';
 // Google Docs sync: create an OAuth 2.0 Client ID (Chrome app or Web app). Add this redirect URI in the client.
 // Paste the Client ID below (it ends with .apps.googleusercontent.com). See README → Sync notes to Google Docs.
@@ -813,6 +1558,34 @@ function setNotesSyncStatus(message, type = '') {
   notesSyncStatus.className = 'notes-sync-status' + (type ? ' sync-' + type : '');
 }
 
+async function loadNotesVisibility() {
+  try {
+    const result = await chrome.storage.local.get([NOTES_VISIBLE_KEY]);
+    const isVisible = result[NOTES_VISIBLE_KEY] !== false; // Default to true
+    toggleNotesVisibility(isVisible, false); // false = don't persist
+  } catch { /* dev */ }
+}
+
+async function persistNotesVisibility(isVisible) {
+  try {
+    await chrome.storage.local.set({ [NOTES_VISIBLE_KEY]: isVisible });
+  } catch { /* dev */ }
+}
+
+function toggleNotesVisibility(isVisible, persist = true) {
+  if (!notesSection || !notesContent || !notesToggle) return;
+  if (isVisible) {
+    notesSection.classList.remove('notes-collapsed');
+    notesToggle.setAttribute('aria-expanded', 'true');
+    notesToggle.setAttribute('title', 'Hide notes');
+  } else {
+    notesSection.classList.add('notes-collapsed');
+    notesToggle.setAttribute('aria-expanded', 'false');
+    notesToggle.setAttribute('title', 'Show notes');
+  }
+  if (persist) persistNotesVisibility(isVisible);
+}
+
 function bindNotesEvents() {
   if (!notesText) return;
   notesText.addEventListener('input', () => {
@@ -820,6 +1593,12 @@ function bindNotesEvents() {
     notesSaveTimer = setTimeout(persistNotes, 500);
   });
   if (notesSyncBtn) notesSyncBtn.addEventListener('click', () => syncNotesToGoogle());
+  if (notesToggle) {
+    notesToggle.addEventListener('click', () => {
+      const isCurrentlyVisible = !notesSection.classList.contains('notes-collapsed');
+      toggleNotesVisibility(!isCurrentlyVisible);
+    });
+  }
 }
 
 async function getGoogleAccessToken() {
