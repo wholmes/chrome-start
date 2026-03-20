@@ -1,17 +1,20 @@
 # Start Page
 
-A Chrome extension that replaces the new tab with a minimal, customizable start page—clock, search, shortcuts, notes, weather-driven visuals, and optional sync to Google Docs.
+A Chrome extension that replaces the new tab with a minimal, customizable start page—clock, search, shortcuts, notes, weather-driven visuals, background slideshow with Unsplash integration, and optional sync to Google Docs.
 
 ## Features
 
 - **Clock & greeting** — Live time and contextual greeting (Good morning / afternoon / evening)
 - **Weather** — Current conditions and temperature (°F) from your location; the background orb and accent colors change with the weather (clear, cloudy, rain, snow, storm, etc.)
+- **Background slideshow** — Beautiful image slideshow with smooth transitions (fade, crossfade, zoom, slide, blur); upload your own images or browse Unsplash photos
+- **Unsplash integration** — Search and browse millions of free photos directly in the extension; automatic photo credits with proper attribution
+- **Dynamic text color** — Text color automatically adjusts (black/white) based on background image brightness for optimal readability
 - **Search** — Web search with your choice of engine (Google, DuckDuckGo, Bing, Brave Search)
 - **Shortcuts** — Custom links in a grid with optional SVG icons and accent colors
 - **Groups** — Organize shortcuts into sections (e.g. Work, Personal); add, rename, reorder, or delete groups
 - **Reorder** — Drag-and-drop shortcuts within and between groups; move groups up/down with ▲ ▼
 - **Themes** — Dark, light, or follow system preference
-- **Notes** — Quick notes saved locally; optional one-way sync to a single Google Doc
+- **Notes** — Quick notes saved locally with collapse/expand toggle; optional one-way sync to a single Google Doc
 - **Backup & restore** — Export and import shortcuts, groups, and notes as JSON
 
 All data is stored locally in the extension and persists across browser restarts and extension updates.
@@ -45,7 +48,9 @@ All data is stored locally in the extension and persists across browser restarts
 | **Edit shortcut** | Hover a shortcut and click the pencil icon. |
 | **Reorder shortcuts** | Drag a shortcut to another position or into another group. |
 | **Groups** | “Add group” to create a section; use the pencil to rename, ▲ ▼ to reorder, “+” to add a shortcut to that group. |
-| **Notes** | Type in the Notes area; content auto-saves locally. Use “Sync to Google” to push to a Google Doc (see below). |
+| **Notes** | Type in the Notes area; content auto-saves locally. Click the chevron (▼) next to “Notes” to collapse/expand. Use “Sync to Google” to push to a Google Doc (see below). |
+| **Background slideshow** | Click “Background” (top-right) → “Upload” to add local images, or “Unsplash” to browse photos. Configure transition style, duration, and speed. |
+| **Unsplash photos** | Click “Background” → “Unsplash” → enter your API key (see below) → search and click any photo to add it. Photo credits appear automatically. |
 | **Backup** | Click “Backup” to download a JSON file (shortcuts, groups, notes, settings). Use “Restore” to load a backup. |
 
 ## Sync notes to Google Docs (optional)
@@ -66,6 +71,46 @@ Notes can be pushed to a single Google Doc named **“Start Page Notes”**. Syn
 6. Reload the extension, then on the start page click **Sync to Google**. Sign in when prompted; a doc will be created and later syncs will update it.
 
 Sync replaces the doc body with your current notes. The update avoids the Docs API restriction that `deleteContentRange` cannot include the newline at the end of a segment by deleting only up to that character, then inserting the new content.
+
+## Background slideshow
+
+Add multiple background images that cycle automatically with smooth transitions. Images can be uploaded from your computer or added from Unsplash.
+
+### Upload images
+
+1. Click **“Background”** (top-right, next to Logo)
+2. Click **“Upload”** and select one or more images
+3. Choose your transition style (fade, crossfade, zoom, slide, blur)
+4. Set duration (how long each image shows) and transition speed
+5. Click **“Save”** — images appear immediately
+
+### Unsplash integration
+
+Browse and add photos from Unsplash’s free photo library:
+
+1. Get a free Unsplash API key:
+   - Visit [Unsplash Developers](https://unsplash.com/developers)
+   - Sign up (free, no credit card required)
+   - Create a new application
+   - Copy your **Access Key**
+
+2. Add your API key:
+   - Click **“Background”** → **“Unsplash”**
+   - Paste your API key and click **“Save”**
+
+3. Browse photos:
+   - Search for keywords (e.g., “nature”, “mountains”, “city”)
+   - Or leave search empty for random photos
+   - Click any photo (or the + button) to add it to your slideshow
+
+4. Photo credits:
+   - Credits appear automatically in the bottom-right corner
+   - Click to visit the photographer’s Unsplash profile
+   - Credits follow Unsplash’s attribution requirements
+
+### Dynamic text color
+
+Text color (black or white) automatically adjusts based on background image brightness for optimal readability. Light images use dark text; dark images use light text.
 
 ## License
 
