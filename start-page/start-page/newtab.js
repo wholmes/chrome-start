@@ -98,6 +98,9 @@ const googleOAuthClientIdInput = $('googleOAuthClientId');
 const googleExtensionIdInput = $('googleExtensionId');
 const notesSection      = $('notesSection');
 const notesToggle       = $('notesToggle');
+const weatherAnimToggle = $('weatherAnimToggle');
+const weatherAnimToggleFixed = $('weatherAnimToggleFixed');
+const weatherAnimations = $('weatherAnimations');
 const notesContent       = $('notesContent');
 const weatherBadge      = $('weatherBadge');
 const weatherIcon       = $('weatherIcon');
@@ -230,6 +233,7 @@ async function init() {
   await loadNotes();
   await loadNotesVisibility();
   await loadGoogleOAuthClientId();
+  await loadWeatherAnimEnabled();
   await loadWeatherFromCache();
   loadWeather();
   await loadUnsplashApiKey();
@@ -243,6 +247,7 @@ async function init() {
   bindNotesEvents();
   bindLogoEvents();
   bindBackgroundEvents();
+  bindWeatherAnimEvents();
 }
 
 function applyTheme() {
@@ -1051,8 +1056,10 @@ async function loadWeatherFromCache() {
     const cached = raw[WEATHER_CACHE_KEY];
     if (!cached || !cached.data || typeof cached.at !== 'number') return;
     if (Date.now() - cached.at > WEATHER_CACHE_TTL_MS) return;
-    applyWeatherTheme(wmoToTheme(cached.data.weather_code));
+    const themeKey = wmoToTheme(cached.data.weather_code);
+    applyWeatherTheme(themeKey);
     renderWeatherBadge(cached.data);
+    updateWeatherAnimations(themeKey);
   } catch { /* ignore */ }
 }
 
@@ -1091,10 +1098,154 @@ async function loadWeather() {
     const themeKey = wmoToTheme(data.weather_code);
     applyWeatherTheme(themeKey);
     renderWeatherBadge(data);
+    updateWeatherAnimations(themeKey);
     await chrome.storage.local.set({
       [WEATHER_CACHE_KEY]: { data, at: Date.now() },
     });
   } catch { /* ignore */ }
+}
+
+// ─── Weather Animations ────────────────────────────────────────────────────────
+
+let weatherAnimEnabled = true;
+let weatherAnimInterval = null;
+
+async function loadWeatherAnimEnabled() {
+  try {
+    const result = await chrome.storage.local.get([WEATHER_ANIM_ENABLED_KEY]);
+    weatherAnimEnabled = result[WEATHER_ANIM_ENABLED_KEY] !== false; // default true
+    if (weatherAnimToggle) weatherAnimToggle.checked = weatherAnimEnabled;
+  } catch { /* ignore */ }
+}
+
+async function saveWeatherAnimEnabled() {
+  if (!weatherAnimToggle) return;
+  weatherAnimEnabled = weatherAnimToggle.checked;
+  try {
+    await chrome.storage.local.set({ [WEATHER_ANIM_ENABLED_KEY]: weatherAnimEnabled });
+    // Update animations immediately
+    const root = document.documentElement;
+    const currentWeather = root.getAttribute('data-weather');
+    if (currentWeather) updateWeatherAnimations(currentWeather);
+  } catch { /* ignore */ }
+}
+
+function clearWeatherAnimations() {
+  if (!weatherAnimations) return;
+  weatherAnimations.innerHTML = '';
+  weatherAnimations.className = 'weather-animations';
+  if (weatherAnimInterval) {
+    clearInterval(weatherAnimInterval);
+    weatherAnimInterval = null;
+  }
+}
+
+function updateWeatherAnimations(themeKey) {
+  clearWeatherAnimations();
+  if (!weatherAnimEnabled || !weatherAnimations || !themeKey) return;
+  
+  weatherAnimations.className = `weather-animations weather-${themeKey}`;
+  weatherAnimations.setAttribute('aria-hidden', 'false');
+  
+  switch (themeKey) {
+    case 'rain':
+      createRainAnimation();
+      break;
+    case 'snow':
+      createSnowAnimation();
+      break;
+    case 'storm':
+      createStormAnimation();
+      break;
+    case 'fog':
+      createFogAnimation();
+      break;
+    case 'clear':
+      createClearAnimation();
+      break;
+    case 'partly-cloudy':
+    case 'cloudy':
+      createCloudyAnimation();
+      break;
+  }
+}
+
+function createRainAnimation() {
+  for (let i = 0; i < 80; i++) {
+    const drop = document.createElement('div');
+    drop.className = 'rain-drop';
+    drop.style.left = Math.random() * 100 + '%';
+    drop.style.animationDelay = Math.random() * 2 + 's';
+    drop.style.animationDuration = (0.5 + Math.random() * 0.5) + 's';
+    weatherAnimations.appendChild(drop);
+  }
+}
+
+function createSnowAnimation() {
+  for (let i = 0; i < 50; i++) {
+    const flake = document.createElement('div');
+    flake.className = 'snowflake';
+    flake.textContent = ['❄', '❅', '❆'][Math.floor(Math.random() * 3)];
+    flake.style.left = Math.random() * 100 + '%';
+    flake.style.animationDelay = Math.random() * 5 + 's';
+    flake.style.animationDuration = (3 + Math.random() * 4) + 's';
+    flake.style.fontSize = (8 + Math.random() * 12) + 'px';
+    flake.style.opacity = 0.3 + Math.random() * 0.7;
+    weatherAnimations.appendChild(flake);
+  }
+}
+
+function createStormAnimation() {
+  // Lightning flashes
+  weatherAnimInterval = setInterval(() => {
+    const flash = document.createElement('div');
+    flash.className = 'lightning-flash';
+    weatherAnimations.appendChild(flash);
+    setTimeout(() => flash.remove(), 150);
+  }, 2000 + Math.random() * 3000);
+  
+  // Rain
+  createRainAnimation();
+}
+
+function createFogAnimation() {
+  for (let i = 0; i < 20; i++) {
+    const fog = document.createElement('div');
+    fog.className = 'fog-particle';
+    fog.style.left = Math.random() * 100 + '%';
+    fog.style.animationDelay = Math.random() * 10 + 's';
+    fog.style.animationDuration = (15 + Math.random() * 10) + 's';
+    fog.style.opacity = 0.1 + Math.random() * 0.3;
+    weatherAnimations.appendChild(fog);
+  }
+}
+
+function createClearAnimation() {
+  for (let i = 0; i < 8; i++) {
+    const ray = document.createElement('div');
+    ray.className = 'sun-ray';
+    ray.style.transform = `rotate(${i * 45}deg)`;
+    ray.style.animationDelay = (i * 0.1) + 's';
+    weatherAnimations.appendChild(ray);
+  }
+}
+
+function createCloudyAnimation() {
+  for (let i = 0; i < 15; i++) {
+    const cloud = document.createElement('div');
+    cloud.className = 'cloud-particle';
+    cloud.style.left = Math.random() * 100 + '%';
+    cloud.style.animationDelay = Math.random() * 5 + 's';
+    cloud.style.animationDuration = (20 + Math.random() * 15) + 's';
+    cloud.style.opacity = 0.15 + Math.random() * 0.25;
+    weatherAnimations.appendChild(cloud);
+  }
+}
+
+function bindWeatherAnimEvents() {
+  if (weatherAnimToggle) {
+    weatherAnimToggle.addEventListener('change', saveWeatherAnimEnabled);
+  }
 }
 
 function migrateLegacyShortcuts() {
@@ -1538,6 +1689,7 @@ const NOTES_GOOGLE_DOC_ID_KEY = 'notesGoogleDocId';
 const NOTES_GOOGLE_TOKEN_KEY = 'notesGoogleAccessToken';
 const NOTES_VISIBLE_KEY = 'notesVisible';
 const GOOGLE_OAUTH_CLIENT_ID_KEY = 'googleOAuthClientId';
+const WEATHER_ANIM_ENABLED_KEY = 'weatherAnimEnabled';
 const GOOGLE_OAUTH_SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file';
 // Default extension ID - users can see their own in chrome://extensions
 const DEFAULT_EXTENSION_ID = 'kgciifcaeddohhpemljgbojiadakdapa';

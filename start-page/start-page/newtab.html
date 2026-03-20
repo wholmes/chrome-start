@@ -15,6 +15,9 @@
   <!-- Background slideshow -->
   <div class="bg-slideshow" id="bgSlideshow" aria-hidden="true"></div>
 
+  <!-- Weather animations container -->
+  <div class="weather-animations" id="weatherAnimations" aria-hidden="true"></div>
+
   <!-- Ambient background orb -->
   <div class="bg-orb"></div>
 
@@ -143,6 +146,15 @@
         <input type="file" id="restoreInput" accept=".json,application/json" hidden aria-label="Choose backup file">
       </div>
     </section>
+
+    <!-- Weather animation toggle (lower left) -->
+    <div class="weather-anim-toggle-fixed" id="weatherAnimToggleFixed">
+      <label class="weather-anim-toggle">
+        <input type="checkbox" id="weatherAnimToggle" aria-label="Weather animations">
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Weather animations</span>
+      </label>
+    </div>
 
     <footer class="page-footer" role="contentinfo">
       <p class="footer-copyright">© <span id="copyrightYear"></span> Chrome Start by Whittfield Holmes</p>

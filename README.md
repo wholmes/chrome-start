@@ -6,6 +6,7 @@ A Chrome extension that replaces the new tab with a minimal, customizable start 
 
 - **Clock & greeting** — Live time and contextual greeting (Good morning / afternoon / evening)
 - **Weather** — Current conditions and temperature (°F) from your location; the background orb and accent colors change with the weather (clear, cloudy, rain, snow, storm, etc.)
+- **Weather animations** — Beautiful particle effects that match current conditions (rain, snow, lightning, fog, sun rays, cloud movement) with an on/off toggle
 - **Background slideshow** — Beautiful image slideshow with smooth transitions (fade, crossfade, zoom, slide, blur); upload your own images or browse Unsplash photos
 - **Unsplash integration** — Search and browse millions of free photos directly in the extension; automatic photo credits with proper attribution
 - **Dynamic text color** — Text color automatically adjusts (black/white) based on background image brightness for optimal readability
@@ -44,6 +45,7 @@ All data is stored locally in the extension and persists across browser restarts
 | **Search engine** | Use the “Search with” dropdown under the search bar. |
 | **Theme** | Use the “Theme” dropdown (System / Light / Dark). |
 | **Weather** | Allow location when prompted; current conditions and temp (°F) appear below the clock and drive the orb/accent colors. Cached for 30 min. |
+| **Weather animations** | Toggle "Weather animations" in the search options to enable/disable particle effects (rain, snow, lightning, fog, sun rays, clouds) that match current conditions. |
 | **Add shortcut** | Click “Add shortcut” or the “+” on a group header; set name, URL, optional SVG icon and color. |
 | **Edit shortcut** | Hover a shortcut and click the pencil icon. |
 | **Reorder shortcuts** | Drag a shortcut to another position or into another group. |
