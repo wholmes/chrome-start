@@ -720,6 +720,9 @@ body:has(.bg-slideshow[style*="display: block"]) {
 .notes-sync-row {
   display: flex;
   align-items: center;
+  gap: 8px;
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
 

@@ -89,6 +89,13 @@ const restoreInput      = $('restoreInput');
 const notesText         = $('notesText');
 const notesSyncBtn      = $('notesSyncBtn');
 const notesSyncStatus   = $('notesSyncStatus');
+const notesSyncSettingsBtn = $('notesSyncSettingsBtn');
+const googleDocsOverlay = $('googleDocsOverlay');
+const googleDocsCloseBtn = $('googleDocsCloseBtn');
+const googleDocsCancelBtn = $('googleDocsCancelBtn');
+const googleDocsSaveBtn = $('googleDocsSaveBtn');
+const googleOAuthClientIdInput = $('googleOAuthClientId');
+const googleExtensionIdInput = $('googleExtensionId');
 const notesSection      = $('notesSection');
 const notesToggle       = $('notesToggle');
 const notesContent       = $('notesContent');
@@ -222,6 +229,7 @@ async function init() {
   await loadLogo();
   await loadNotes();
   await loadNotesVisibility();
+  await loadGoogleOAuthClientId();
   await loadWeatherFromCache();
   loadWeather();
   await loadUnsplashApiKey();
@@ -1529,11 +1537,12 @@ const NOTES_STORAGE_KEY = 'notesContent';
 const NOTES_GOOGLE_DOC_ID_KEY = 'notesGoogleDocId';
 const NOTES_GOOGLE_TOKEN_KEY = 'notesGoogleAccessToken';
 const NOTES_VISIBLE_KEY = 'notesVisible';
+const GOOGLE_OAUTH_CLIENT_ID_KEY = 'googleOAuthClientId';
 const GOOGLE_OAUTH_SCOPES = 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file';
-// Google Docs sync: create an OAuth 2.0 Client ID (Chrome app or Web app). Add this redirect URI in the client.
-// Paste the Client ID below (it ends with .apps.googleusercontent.com). See README → Sync notes to Google Docs.
-const GOOGLE_OAUTH_REDIRECT_URI = 'https://kgciifcaeddohhpemljgbojiadakdapa.chromiumapp.org';
-const GOOGLE_OAUTH_CLIENT_ID = '642641355561-55mtt5d770amqedt1okqqoa3fs9e96e5.apps.googleusercontent.com';
+// Default extension ID - users can see their own in chrome://extensions
+const DEFAULT_EXTENSION_ID = 'kgciifcaeddohhpemljgbojiadakdapa';
+
+let googleOAuthClientId = '';
 
 let notesSaveTimer = null;
 
@@ -1586,6 +1595,45 @@ function toggleNotesVisibility(isVisible, persist = true) {
   if (persist) persistNotesVisibility(isVisible);
 }
 
+async function loadGoogleOAuthClientId() {
+  try {
+    const result = await chrome.storage.local.get([GOOGLE_OAUTH_CLIENT_ID_KEY]);
+    googleOAuthClientId = result[GOOGLE_OAUTH_CLIENT_ID_KEY] || '';
+    if (googleOAuthClientIdInput) {
+      googleOAuthClientIdInput.value = googleOAuthClientId;
+    }
+    // Get extension ID
+    if (googleExtensionIdInput) {
+      chrome.management.getSelf((info) => {
+        if (info && info.id) {
+          googleExtensionIdInput.value = info.id;
+        } else {
+          googleExtensionIdInput.value = DEFAULT_EXTENSION_ID;
+        }
+      });
+    }
+  } catch { /* ignore */ }
+}
+
+async function saveGoogleOAuthClientId() {
+  if (!googleOAuthClientIdInput) return;
+  googleOAuthClientId = googleOAuthClientIdInput.value.trim();
+  try {
+    await chrome.storage.local.set({ [GOOGLE_OAUTH_CLIENT_ID_KEY]: googleOAuthClientId });
+  } catch { /* ignore */ }
+}
+
+function openGoogleDocsSettings() {
+  if (!googleDocsOverlay) return;
+  loadGoogleOAuthClientId();
+  googleDocsOverlay.classList.add('open');
+  setTimeout(() => googleOAuthClientIdInput?.focus(), 60);
+}
+
+function closeGoogleDocsSettings() {
+  if (googleDocsOverlay) googleDocsOverlay.classList.remove('open');
+}
+
 function bindNotesEvents() {
   if (!notesText) return;
   notesText.addEventListener('input', () => {
@@ -1593,6 +1641,17 @@ function bindNotesEvents() {
     notesSaveTimer = setTimeout(persistNotes, 500);
   });
   if (notesSyncBtn) notesSyncBtn.addEventListener('click', () => syncNotesToGoogle());
+  if (notesSyncSettingsBtn) notesSyncSettingsBtn.addEventListener('click', openGoogleDocsSettings);
+  if (googleDocsSaveBtn) googleDocsSaveBtn.addEventListener('click', async () => {
+    await saveGoogleOAuthClientId();
+    closeGoogleDocsSettings();
+  });
+  if (googleDocsCloseBtn) googleDocsCloseBtn.addEventListener('click', closeGoogleDocsSettings);
+  if (googleDocsCancelBtn) googleDocsCancelBtn.addEventListener('click', closeGoogleDocsSettings);
+  if (googleDocsOverlay) googleDocsOverlay.addEventListener('click', (e) => { if (e.target === googleDocsOverlay) closeGoogleDocsSettings(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && googleDocsOverlay && googleDocsOverlay.classList.contains('open')) closeGoogleDocsSettings();
+  });
   if (notesToggle) {
     notesToggle.addEventListener('click', () => {
       const isCurrentlyVisible = !notesSection.classList.contains('notes-collapsed');
@@ -1601,9 +1660,19 @@ function bindNotesEvents() {
   }
 }
 
+function getGoogleOAuthRedirectUri() {
+  // Get extension ID dynamically, fallback to default
+  return new Promise((resolve) => {
+    chrome.management.getSelf((info) => {
+      const extId = info?.id || DEFAULT_EXTENSION_ID;
+      resolve(`https://${extId}.chromiumapp.org`);
+    });
+  });
+}
+
 async function getGoogleAccessToken() {
-  if (GOOGLE_OAUTH_CLIENT_ID.startsWith('YOUR_')) {
-    setNotesSyncStatus('Paste your Google OAuth Client ID in newtab.js (see README: Sync notes to Google Docs).', 'sync-error');
+  if (!googleOAuthClientId || googleOAuthClientId.startsWith('YOUR_') || !googleOAuthClientId.includes('.apps.googleusercontent.com')) {
+    setNotesSyncStatus('Google OAuth Client ID not configured. Click the settings icon (⚙) to add your Client ID.', 'sync-error');
     return null;
   }
   if (!chrome.identity || typeof chrome.identity.launchWebAuthFlow !== 'function') {
@@ -1611,10 +1680,10 @@ async function getGoogleAccessToken() {
     return null;
   }
   try {
-    const redirectUrl = GOOGLE_OAUTH_REDIRECT_URI;
+    const redirectUrl = await getGoogleOAuthRedirectUri();
     const authUrl =
       'https://accounts.google.com/o/oauth2/v2/auth?' +
-      'client_id=' + encodeURIComponent(GOOGLE_OAUTH_CLIENT_ID) +
+      'client_id=' + encodeURIComponent(googleOAuthClientId) +
       '&redirect_uri=' + encodeURIComponent(redirectUrl) +
       '&response_type=token' +
       '&scope=' + encodeURIComponent(GOOGLE_OAUTH_SCOPES) +
@@ -1629,7 +1698,7 @@ async function getGoogleAccessToken() {
     const urlObj = new URL(responseUrl);
     const err = urlObj.searchParams.get('error');
     if (err === 'redirect_uri_mismatch') {
-      setNotesSyncStatus('Redirect URI mismatch. In Google Cloud add this exact Authorized redirect URI: ' + redirectUrl, 'sync-error');
+      setNotesSyncStatus('Redirect URI mismatch. In Google Cloud Console, add this exact Authorized redirect URI: ' + redirectUrl, 'sync-error');
       return null;
     }
     if (err) {
@@ -1698,11 +1767,88 @@ async function syncNotesToGoogle() {
   if (!token) return;
   try {
     const docId = await ensureGoogleDoc(token);
+    if (!docId) {
+      setNotesSyncStatus('No document ID found. Please try syncing again.', 'sync-error');
+      return;
+    }
     const content = notesText ? notesText.value : '';
     const res = await fetch('https://docs.googleapis.com/v1/documents/' + docId, {
       headers: { 'Authorization': 'Bearer ' + token },
     });
-    if (!res.ok) throw new Error('Failed to load doc');
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const errorMsg = errorData.error?.message || res.statusText || 'Failed to load doc';
+      if (res.status === 401 || res.status === 403) {
+        // Token expired or invalid - clear it and ask to sign in again
+        await chrome.storage.local.remove([NOTES_GOOGLE_TOKEN_KEY, NOTES_GOOGLE_DOC_ID_KEY]);
+        setNotesSyncStatus('Session expired. Please click "Sync to Google" again to sign in.', 'sync-error');
+        return;
+      } else if (res.status === 404) {
+        // Doc was deleted - clear the stored ID and create a new one
+        await chrome.storage.local.remove([NOTES_GOOGLE_DOC_ID_KEY]);
+        setNotesSyncStatus('Document not found. Creating a new one...', 'sync-success');
+        // Retry with a fresh doc
+        const newDocId = await ensureGoogleDoc(token);
+        if (!newDocId) {
+          setNotesSyncStatus('Failed to create new document.', 'sync-error');
+          return;
+        }
+        // Continue with the new docId - fetch it and sync
+        const retryRes = await fetch('https://docs.googleapis.com/v1/documents/' + newDocId, {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (!retryRes.ok) {
+          const retryError = await retryRes.json().catch(() => ({}));
+          throw new Error(retryError.error?.message || 'Failed to load new doc');
+        }
+        const doc = await retryRes.json();
+        const contentEl = doc.body?.content;
+        if (!contentEl?.length) throw new Error('Invalid doc structure');
+        const startIndex = 1;
+        let endIndex = 1;
+        for (const el of contentEl) {
+          if (el.endIndex != null) endIndex = el.endIndex;
+        }
+        const requests = [];
+        if (endIndex > startIndex) {
+          const deleteEnd = endIndex - 1;
+          if (deleteEnd > startIndex) {
+            requests.push({
+              deleteContentRange: {
+                range: { startIndex, endIndex: deleteEnd },
+              },
+            });
+          }
+        }
+        const textToInsert = content + '\n';
+        if (textToInsert.length > 0) {
+          requests.push({
+            insertText: {
+              location: { index: startIndex },
+              text: textToInsert,
+            },
+          });
+        }
+        if (requests.length > 0) {
+          const updateRes = await fetch('https://docs.googleapis.com/v1/documents/' + newDocId + ':batchUpdate', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ requests }),
+          });
+          if (!updateRes.ok) {
+            const updateError = await updateRes.json().catch(() => ({}));
+            throw new Error(updateError.error?.message || 'Failed to update doc');
+          }
+        }
+        setNotesSyncStatus('Synced to Google Docs', 'sync-success');
+        return;
+      } else {
+        throw new Error(errorMsg);
+      }
+    }
     const doc = await res.json();
     const contentEl = doc.body?.content;
     if (!contentEl?.length) throw new Error('Invalid doc structure');

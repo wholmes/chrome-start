@@ -6,7 +6,7 @@
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
-  "permissions": ["storage", "identity"],
+  "permissions": ["storage", "identity", "management"],
   "host_permissions": [
     "https://docs.googleapis.com/*",
     "https://www.googleapis.com/*",

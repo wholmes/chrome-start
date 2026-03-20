@@ -59,16 +59,21 @@ Notes can be pushed to a single Google Doc named **“Start Page Notes”**. Syn
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/) and create or select a project.
 2. **Enable APIs**: APIs & Services → Library → enable **Google Docs API** and **Google Drive API**.
-3. **Create OAuth client**: APIs & Services → Credentials → Create Credentials → **OAuth client ID**.  
+3. **Get your Extension ID**:
+   - On the start page, click the **settings icon (⚙)** next to "Sync to Google"
+   - The modal shows your Extension ID — copy this value
+4. **Create OAuth client**: APIs & Services → Credentials → Create Credentials → **OAuth client ID**.  
    - Application type: **Chrome application**  
-   - Application ID: `kgciifcaeddohhpemljgbojiadakdapa` (or your extension ID from `chrome://extensions` if different).
-4. Copy the **Client ID** (e.g. `123456789-xxx.apps.googleusercontent.com`).
-5. In the extension folder, open **`newtab.js`** and set:
-   ```js
-   const GOOGLE_OAUTH_CLIENT_ID = 'your-client-id.apps.googleusercontent.com';
-   ```
-   (Replace the placeholder `YOUR_CLIENT_ID.apps.googleusercontent.com`.)
-6. Reload the extension, then on the start page click **Sync to Google**. Sign in when prompted; a doc will be created and later syncs will update it.
+   - Application ID: Paste your Extension ID from step 3
+   - Add this redirect URI (replace `YOUR_EXTENSION_ID` with your Extension ID):
+     ```
+     https://YOUR_EXTENSION_ID.chromiumapp.org
+     ```
+5. Copy the **Client ID** from Google Cloud Console (e.g. `123456789-xxx.apps.googleusercontent.com`).
+6. **Configure in extension**:
+   - In the settings modal (⚙ icon), paste your Client ID into the "Google OAuth Client ID" field
+   - Click **"Save"**
+7. Click **"Sync to Google"** on the start page. Sign in when prompted; a doc will be created and later syncs will update it.
 
 Sync replaces the doc body with your current notes. The update avoids the Docs API restriction that `deleteContentRange` cannot include the newline at the end of a segment by deleting only up to that character, then inserting the new content.
 
