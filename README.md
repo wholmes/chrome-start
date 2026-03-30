@@ -42,7 +42,7 @@ All data is stored locally in the extension and persists across browser restarts
    - Turn on **Developer mode** (top right)
    - Click **Load unpacked**
    - Select the folder that contains `manifest.json`  
-     From the repo root, that folder is: **`start-page/start-page`**
+     From the repo root, that folder is **this repository’s root** (the same directory as `README.md` and `manifest.json`).
 
 3. Open a **new tab** to use Chrome Start.
 
