@@ -1211,12 +1211,12 @@ function createFogAnimation() {
 }
 
 function createClearAnimation() {
-  for (let i = 0; i < 8; i++) {
-    const ray = document.createElement('div');
-    ray.className = 'sun-ray';
-    ray.style.transform = `rotate(${i * 45}deg)`;
-    ray.style.animationDelay = (i * 0.1) + 's';
-    weatherAnimations.appendChild(ray);
+  // Soft upper glow only — radial spokes from center read like clock hands on the page
+  for (let i = 0; i < 3; i++) {
+    const glow = document.createElement('div');
+    glow.className = 'clear-sky-glow';
+    glow.style.animationDelay = (i * 0.8) + 's';
+    weatherAnimations.appendChild(glow);
   }
 }
 
