@@ -126,6 +126,7 @@ const sidePanelCloseBtn = $('sidePanelCloseBtn');
 const pageHeaderSection = $('pageHeaderSection');
 const searchSectionWrap = $('searchSectionWrap');
 const pageFooter        = $('pageFooter');
+const pageRoot          = $('page');
 const firstRunTip       = $('firstRunTip');
 const firstRunTipDismiss = $('firstRunTipDismiss');
 const undoToast         = $('undoToast');
@@ -2303,6 +2304,165 @@ function populateGroupSelect() {
   fillGroupSelect(fGroup);
 }
 
+// ─── Drop URL / tab onto page (add shortcut) ─────────────────────────────────
+
+/** @param {DragEvent} e */
+function pageDropTargetAllowed(e) {
+  const t = e.target;
+  if (!t || typeof t.closest !== 'function') return false;
+  return !t.closest('input, textarea, select, [contenteditable="true"]');
+}
+
+function isBlockingOverlayOpenForDrop() {
+  if (overlay?.classList.contains('open')) return true;
+  if (layoutPanelOpen) return true;
+  if (tabsOverlay?.classList.contains('open')) return true;
+  if (bookmarksOverlay?.classList.contains('open')) return true;
+  return false;
+}
+
+/** @param {DragEvent} e */
+function shouldAcceptExternalUrlDrag(e) {
+  const dt = e.dataTransfer;
+  if (!dt?.types) return false;
+  const types = Array.from(dt.types);
+  if (types.includes('text/uri-list')) return true;
+  if (types.includes('text/x-moz-url')) return true;
+  if (types.includes('URL')) return true;
+  if (types.includes('text/plain')) {
+    if (dt.effectAllowed === 'move') return false;
+    return true;
+  }
+  return false;
+}
+
+function firstUriFromUriList(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  const lines = raw.split(/\r?\n/);
+  for (let line of lines) {
+    line = line.trim();
+    if (!line || line.startsWith('#')) continue;
+    const url = line.split('\t')[0].trim();
+    if (url) return url;
+  }
+  return '';
+}
+
+function isHttpShortcutUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** @param {DataTransfer | null} dt */
+function extractUrlFromDataTransfer(dt) {
+  if (!dt) return null;
+  const plainEarly = (dt.getData('text/plain') || '').trim();
+  if (/^[0-9a-f]{8}$/i.test(plainEarly)) return null;
+
+  const fromList = firstUriFromUriList(dt.getData('text/uri-list'));
+  if (fromList) {
+    const n = normaliseUrl(fromList);
+    if (n && isHttpShortcutUrl(n)) return { url: n, title: '' };
+  }
+
+  const moz = dt.getData('text/x-moz-url');
+  if (moz) {
+    const lines = moz.split('\n');
+    const u = (lines[0] || '').trim();
+    const title = (lines[1] || '').trim();
+    const n = normaliseUrl(u);
+    if (n && isHttpShortcutUrl(n)) return { url: n, title };
+  }
+
+  const legacyUrl = dt.getData('URL');
+  if (legacyUrl) {
+    const n = normaliseUrl(legacyUrl.trim());
+    if (n && isHttpShortcutUrl(n)) return { url: n, title: '' };
+  }
+
+  const plain = plainEarly;
+  if (plain) {
+    const lines = plain.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      if (/^https?:\/\//i.test(line) || /^www\./i.test(line)) {
+        const n = normaliseUrl(line);
+        if (n && isHttpShortcutUrl(n)) {
+          const titleGuess = lines[0] !== line && !/^https?:/i.test(lines[0]) ? lines[0] : '';
+          return { url: n, title: titleGuess };
+        }
+      }
+    }
+    const n = normaliseUrl(plain);
+    if (n && isHttpShortcutUrl(n)) return { url: n, title: '' };
+  }
+
+  return null;
+}
+
+function suggestedShortcutNameFromUrl(url) {
+  let host = hostnameFromUrl(url);
+  if (!host) return 'New shortcut';
+  host = host.replace(/^www\./i, '');
+  const first = host.split('.')[0] || host;
+  if (!first) return 'New shortcut';
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
+function clearPageExtUrlDragHighlight() {
+  pageRoot?.classList.remove('page--ext-url-drag');
+}
+
+/** @param {DragEvent} e */
+function onPageExternalUrlDragOver(e) {
+  if (!pageRoot) return;
+  if (!pageDropTargetAllowed(e) || isBlockingOverlayOpenForDrop()) {
+    clearPageExtUrlDragHighlight();
+    return;
+  }
+  if (!shouldAcceptExternalUrlDrag(e)) {
+    clearPageExtUrlDragHighlight();
+    return;
+  }
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  pageRoot.classList.add('page--ext-url-drag');
+}
+
+/** @param {DragEvent} e */
+function onPageExternalUrlDropCapture(e) {
+  clearPageExtUrlDragHighlight();
+  if (!pageRoot) return;
+  if (!pageDropTargetAllowed(e) || isBlockingOverlayOpenForDrop()) return;
+  const parsed = extractUrlFromDataTransfer(e.dataTransfer);
+  if (!parsed?.url) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const grid = e.target.closest('.shortcuts-grid');
+  const groupId = grid?.dataset?.groupId || null;
+  openModalFromDroppedUrl(parsed.url, parsed.title, groupId);
+}
+
+function openModalFromDroppedUrl(url, titleHint, defaultGroupId) {
+  const norm = normaliseUrl(String(url || '').trim());
+  if (!norm || !isHttpShortcutUrl(norm)) return;
+  openModal(null, defaultGroupId || null);
+  fUrl.value = norm;
+  const t = (titleHint || '').trim();
+  fName.value = t || suggestedShortcutNameFromUrl(norm);
+  setTimeout(() => fName.focus(), 70);
+}
+
+function bindPageUrlDropTarget() {
+  if (!pageRoot) return;
+  pageRoot.addEventListener('dragover', onPageExternalUrlDragOver, true);
+  pageRoot.addEventListener('drop', onPageExternalUrlDropCapture, true);
+  document.addEventListener('dragend', clearPageExtUrlDragHighlight, true);
+}
+
 // ─── Modal ───────────────────────────────────────────────────────────────────
 
 function openModal(id = null, defaultGroupId = null) {
@@ -3185,6 +3345,8 @@ function bindEvents() {
     }
     if (overlay.classList.contains('open')) closeModal();
   });
+
+  bindPageUrlDropTarget();
 
   if (fromTabsBtn) fromTabsBtn.addEventListener('click', () => openTabsImportModal());
   if (tabsCloseBtn) tabsCloseBtn.addEventListener('click', () => closeTabsImportModal());
