@@ -779,6 +779,203 @@ body:has(.bg-slideshow[style*="display: block"]) {
   gap: 28px;
 }
 
+/* View toggle: grid vs compact list */
+.shortcuts-view-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.shortcuts-view-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.shortcuts-view-toggle {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  gap: 2px;
+}
+
+.view-toggle-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-mid);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+}
+
+.view-toggle-btn:hover {
+  color: var(--text);
+}
+
+.view-toggle-btn--active {
+  background: var(--surface-hover);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--border-active);
+}
+
+/* ─── List layout (many shortcuts) ───────────────────────── */
+.shortcuts-section--list {
+  max-width: min(880px, 100%);
+}
+
+.shortcuts-section--list .groups-container {
+  gap: 20px;
+}
+
+.group-section--list .group-header {
+  margin-bottom: 8px;
+}
+
+.shortcuts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.shortcut-list-item {
+  margin: 0;
+}
+
+.shortcut-list-item + .shortcut-list-item .shortcut-list-row {
+  border-top: 1px solid var(--border);
+}
+
+.shortcut-list-row {
+  display: flex;
+  align-items: stretch;
+  min-height: 48px;
+  transition: background 0.15s;
+}
+
+.shortcut-list-row:hover {
+  background: var(--surface-hover);
+}
+
+.shortcut-list-link {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  outline: none;
+}
+
+.shortcut-list-link:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.shortcut-list-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortcut-list-icon svg {
+  display: block;
+  max-width: 22px;
+  max-height: 22px;
+}
+
+.shortcut-list-letter {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  background: var(--list-wash, rgba(255, 255, 255, 0.06));
+}
+
+.shortcut-list-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.shortcut-list-name {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shortcut-list-host {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 300;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shortcut-list-edit {
+  flex-shrink: 0;
+  width: 44px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted-mid);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.shortcut-list-edit:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.shortcut-list-row:hover .shortcut-list-edit {
+  color: var(--muted-mid);
+}
+
+.shortcut-list-row:hover .shortcut-list-edit:hover {
+  color: var(--accent);
+}
+
 .group-section {
   width: 100%;
 }

@@ -50,7 +50,7 @@ const DEFAULT_SHORTCUTS = (() => {
 
 let shortcuts = [];
 let groups   = [];
-let settings = { searchEngine: 'google', theme: 'system' };
+let settings = { searchEngine: 'google', theme: 'system', shortcutsView: 'grid' };
 let editingId = null;
 let editingGroupId = null;
 
@@ -59,6 +59,9 @@ let editingGroupId = null;
 const $ = id => document.getElementById(id);
 
 const groupsContainer = $('groupsContainer');
+const shortcutsSection = $('shortcutsSection');
+const shortcutsViewGridBtn = $('shortcutsViewGrid');
+const shortcutsViewListBtn = $('shortcutsViewList');
 const addBtn          = $('addBtn');
 const addGroupBtn     = $('addGroupBtn');
 const overlay         = $('overlay');
@@ -207,6 +210,7 @@ async function init() {
     settings = {
       searchEngine: typeof stored?.searchEngine === 'string' ? stored.searchEngine : 'google',
       theme: ['dark', 'light', 'system'].includes(stored?.theme) ? stored.theme : 'system',
+      shortcutsView: ['grid', 'list'].includes(stored?.shortcutsView) ? stored.shortcutsView : 'grid',
     };
     shortcuts = result.shortcuts?.length ? result.shortcuts : DEFAULT_SHORTCUTS;
 
@@ -1315,18 +1319,10 @@ function shortcutsForGroup(groupId) {
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
-function renderGroups() {
-  groupsContainer.innerHTML = '';
-  const sortedGroups = [...groups].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-  sortedGroups.forEach((grp, grpIndex) => {
-    const section = document.createElement('section');
-    section.className = 'group-section';
-    section.dataset.groupId = grp.id;
-
-    const header = document.createElement('div');
-    header.className = 'group-header';
-    header.innerHTML = `
+function createGroupHeader(grp) {
+  const header = document.createElement('div');
+  header.className = 'group-header';
+  header.innerHTML = `
       <div class="group-title-row">
         <h3 class="group-title" data-group-id="${grp.id}">${escapeHtml(grp.name)}</h3>
         <div class="group-header-actions">
@@ -1339,24 +1335,55 @@ function renderGroups() {
         </div>
       </div>
     `;
+  return header;
+}
 
-    const grid = document.createElement('div');
-    grid.className = 'shortcuts-grid group-grid';
-    grid.dataset.groupId = grp.id;
-    grid.setAttribute('role', 'list');
-    grid.addEventListener('dragover', onShortcutDragOver);
-    grid.addEventListener('drop', onShortcutDrop);
-    grid.addEventListener('dragenter', onShortcutDragEnter);
-    grid.addEventListener('dragleave', onShortcutDragLeave);
+function syncShortcutsViewUI() {
+  const isList = settings.shortcutsView === 'list';
+  if (shortcutsSection) shortcutsSection.classList.toggle('shortcuts-section--list', isList);
+  if (shortcutsViewGridBtn && shortcutsViewListBtn) {
+    shortcutsViewGridBtn.classList.toggle('view-toggle-btn--active', !isList);
+    shortcutsViewListBtn.classList.toggle('view-toggle-btn--active', isList);
+    shortcutsViewGridBtn.setAttribute('aria-pressed', String(!isList));
+    shortcutsViewListBtn.setAttribute('aria-pressed', String(isList));
+  }
+}
 
-    const items = shortcutsForGroup(grp.id);
-    items.forEach(s => {
-      const card = createShortcutCard(s, grid);
-      grid.appendChild(card);
-    });
+function renderGroups() {
+  groupsContainer.innerHTML = '';
+  syncShortcutsViewUI();
+  const sortedGroups = [...groups].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const listView = settings.shortcutsView === 'list';
 
-    section.appendChild(header);
-    section.appendChild(grid);
+  sortedGroups.forEach((grp) => {
+    const section = document.createElement('section');
+    section.className = listView ? 'group-section group-section--list' : 'group-section';
+    section.dataset.groupId = grp.id;
+    section.appendChild(createGroupHeader(grp));
+
+    if (listView) {
+      const ul = document.createElement('ul');
+      ul.className = 'shortcuts-list';
+      ul.setAttribute('role', 'list');
+      shortcutsForGroup(grp.id).forEach((s) => {
+        ul.appendChild(createShortcutListRow(s));
+      });
+      section.appendChild(ul);
+    } else {
+      const grid = document.createElement('div');
+      grid.className = 'shortcuts-grid group-grid';
+      grid.dataset.groupId = grp.id;
+      grid.setAttribute('role', 'list');
+      grid.addEventListener('dragover', onShortcutDragOver);
+      grid.addEventListener('drop', onShortcutDrop);
+      grid.addEventListener('dragenter', onShortcutDragEnter);
+      grid.addEventListener('dragleave', onShortcutDragLeave);
+      shortcutsForGroup(grp.id).forEach((s) => {
+        grid.appendChild(createShortcutCard(s, grid));
+      });
+      section.appendChild(grid);
+    }
+
     groupsContainer.appendChild(section);
   });
 }
@@ -1425,6 +1452,88 @@ function createShortcutCard(s, gridEl) {
   card.addEventListener('dragleave', onShortcutDragLeave);
 
   return card;
+}
+
+function hostnameFromUrl(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '');
+  } catch {
+    return '';
+  }
+}
+
+function createShortcutListRow(s) {
+  const li = document.createElement('li');
+  li.className = 'shortcut-list-item';
+  li.setAttribute('role', 'listitem');
+
+  const row = document.createElement('div');
+  row.className = 'shortcut-list-row';
+
+  const link = document.createElement('a');
+  link.className = 'shortcut-list-link';
+  link.href = s.url;
+  link.title = s.name;
+
+  const [r, g, b] = hexToRgb(s.color);
+  link.style.setProperty('--list-accent', s.color);
+  link.style.setProperty('--list-wash', `rgba(${r},${g},${b},0.12)`);
+
+  const iconWrap = document.createElement('span');
+  iconWrap.className = 'shortcut-list-icon';
+  iconWrap.style.color = s.color;
+  if (s.svg?.trim()) {
+    iconWrap.innerHTML = sanitizeSvg(s.svg);
+    const svg = iconWrap.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('width', '22');
+      svg.setAttribute('height', '22');
+    }
+  } else {
+    const letter = document.createElement('span');
+    letter.className = 'shortcut-list-letter';
+    letter.style.color = s.color;
+    letter.textContent = s.name.charAt(0).toUpperCase();
+    iconWrap.appendChild(letter);
+  }
+
+  const textCol = document.createElement('span');
+  textCol.className = 'shortcut-list-text';
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'shortcut-list-name';
+  nameEl.textContent = s.name;
+
+  const host = hostnameFromUrl(s.url);
+  const hostEl = document.createElement('span');
+  hostEl.className = 'shortcut-list-host';
+  hostEl.textContent = host;
+
+  textCol.appendChild(nameEl);
+  textCol.appendChild(hostEl);
+
+  link.appendChild(iconWrap);
+  link.appendChild(textCol);
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'shortcut-list-edit';
+  editBtn.type = 'button';
+  editBtn.title = 'Edit shortcut';
+  editBtn.setAttribute('aria-label', `Edit ${s.name}`);
+  editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" width="14" height="14" aria-hidden="true">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  editBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openModal(s.id);
+  });
+
+  row.appendChild(link);
+  row.appendChild(editBtn);
+  li.appendChild(row);
+  return li;
 }
 
 // ─── Drag and drop ───────────────────────────────────────────────────────────
@@ -1789,6 +1898,7 @@ function restoreFromBackup(file) {
       if (data.settings && typeof data.settings === 'object') {
         if (typeof data.settings.searchEngine === 'string') settings.searchEngine = data.settings.searchEngine;
         if (['dark', 'light', 'system'].includes(data.settings.theme)) settings.theme = data.settings.theme;
+        if (['grid', 'list'].includes(data.settings.shortcutsView)) settings.shortcutsView = data.settings.shortcutsView;
       }
       if (typeof data.notes === 'string' && notesText) {
         notesText.value = data.notes;
@@ -1885,6 +1995,22 @@ themeSelect.addEventListener('change', () => {
 function bindEvents() {
   addBtn.addEventListener('click', () => openModal());
   addGroupBtn.addEventListener('click', () => openGroupModal());
+  if (shortcutsViewGridBtn) {
+    shortcutsViewGridBtn.addEventListener('click', () => {
+      if (settings.shortcutsView === 'grid') return;
+      settings.shortcutsView = 'grid';
+      persist();
+      renderGroups();
+    });
+  }
+  if (shortcutsViewListBtn) {
+    shortcutsViewListBtn.addEventListener('click', () => {
+      if (settings.shortcutsView === 'list') return;
+      settings.shortcutsView = 'list';
+      persist();
+      renderGroups();
+    });
+  }
   backupBtn.addEventListener('click', () => exportBackup());
   restoreBtn.addEventListener('click', () => restoreInput.click());
   restoreInput.addEventListener('change', () => restoreFromBackup(restoreInput.files?.[0]));

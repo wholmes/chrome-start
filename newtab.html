@@ -110,6 +110,13 @@
 
     <!-- Shortcuts by group -->
     <section class="shortcuts-section" id="shortcutsSection">
+      <div class="shortcuts-view-bar" id="shortcutsViewBar">
+        <span class="shortcuts-view-label" id="shortcutsViewLabel">Shortcuts layout</span>
+        <div class="shortcuts-view-toggle" role="group" aria-labelledby="shortcutsViewLabel">
+          <button type="button" class="view-toggle-btn view-toggle-btn--active" id="shortcutsViewGrid" aria-pressed="true" title="Icon grid">Grid</button>
+          <button type="button" class="view-toggle-btn" id="shortcutsViewList" aria-pressed="false" title="Compact list of all links">List</button>
+        </div>
+      </div>
       <div class="groups-container" id="groupsContainer"></div>
       <div class="section-actions">
         <button class="add-fab" id="addGroupBtn" title="Add group">
