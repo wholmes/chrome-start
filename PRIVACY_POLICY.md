@@ -15,7 +15,7 @@ All data is stored **locally** on your device using Chrome's `chrome.storage.loc
 The following data is stored locally:
 - **Shortcuts and Groups**: Your custom links, icons, colors, and organizational groups
 - **Notes**: Text content you enter in the notes section
-- **Settings**: Theme preference, search engine choice, shortcuts layout (grid/list), weather animation toggle
+- **Settings**: Theme preference, search engine choice, shortcuts layout (grid/list), weather animation toggle, weather location mode and manual place/coordinates (stored locally only)
 - **Logo**: Custom SVG logo (if you add one)
 - **Background Images**: Images you upload or select from Unsplash (stored as data URLs)
 - **Unsplash API Key**: Your personal Unsplash API key (if you provide one)
@@ -29,11 +29,11 @@ This extension does not require you to create an account or provide any personal
 
 ### Weather Data (Open-Meteo)
 
-- **Service**: Open-Meteo API (https://api.open-meteo.com)
-- **Data Sent**: Your approximate location (latitude/longitude) when you grant location permission
-- **Purpose**: To fetch current weather conditions and temperature
-- **Privacy**: Open-Meteo is a free, open-source weather service. We do not control their privacy practices. Please review their privacy policy if you have concerns.
-- **Location**: Location is only sent when you explicitly grant permission. You can deny location permission and the extension will work without weather data.
+- **Forecast API**: https://api.open-meteo.com — receives **latitude and longitude** to return current conditions and temperature.
+- **Geocoding API** (optional): https://geocoding-api.open-meteo.com — when you choose **manual** weather location and enter a **place name** (not raw coordinates), the extension sends that **search text** to look up coordinates. Coordinates and place queries are not sent to our servers.
+- **Browser location** (optional): If you choose **browser location**, the extension uses Chrome’s location permission to read your coordinates, then sends those coordinates to the forecast API only.
+- **Manual coordinates**: If you enter latitude and longitude yourself, only those numbers are sent to the forecast API (no geocoding request).
+- **Privacy**: Open-Meteo is a free, open-source weather service. We do not control their privacy practices. You can use **manual** location to avoid browser geolocation entirely.
 
 ### Unsplash (Optional)
 
@@ -53,7 +53,7 @@ When you click **From bookmarks**, the extension uses Chrome’s `bookmarks` per
 
 ## Data Transmission
 
-- **Weather API**: Your location coordinates are sent to Open-Meteo when you grant location permission. This happens automatically when the extension loads and checks for weather.
+- **Weather**: Coordinates are sent to Open-Meteo’s forecast API when weather loads. Place names may be sent to Open-Meteo’s geocoding API when you use manual location with a city or address. Browser geolocation is only used if you select that option and grant permission.
 - **Unsplash API**: Search queries and API requests are sent to Unsplash only when you use the Unsplash feature and have provided your API key.
 - **No Other Transmission**: No other data is transmitted to external servers. All other data remains on your device.
 
@@ -90,4 +90,4 @@ This extension complies with:
 
 ---
 
-**Summary**: This extension stores all data locally on your device. The only external data transmission is: (1) location coordinates to Open-Meteo for weather (with your permission), and (2) Unsplash API requests when you use the optional Unsplash feature (with your API key). **From open tabs** and **From bookmarks** only read data on your device to show pick lists; nothing is sent to us. No data is sent to our servers because we don't operate any servers.
+**Summary**: This extension stores all data locally on your device. External transmission includes: (1) Open-Meteo for weather (coordinates to the forecast API; optional geocoding API when you search by place name; optional browser location if you choose it), (2) Unsplash when you use that feature with your API key. **From open tabs** and **From bookmarks** only read data on your device to show pick lists. No data is sent to our servers because we don't operate any servers.

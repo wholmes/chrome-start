@@ -50,7 +50,13 @@ const DEFAULT_SHORTCUTS = (() => {
 
 let shortcuts = [];
 let groups   = [];
-let settings = { searchEngine: 'google', theme: 'system', shortcutsView: 'grid' };
+let settings = {
+  searchEngine: 'google',
+  theme: 'system',
+  shortcutsView: 'grid',
+  weatherLocationMode: 'geolocation',
+  weatherManualText: '',
+};
 let editingId = null;
 let editingGroupId = null;
 let newGroupDefaultParentId = null;
@@ -129,6 +135,10 @@ const weatherBadge      = $('weatherBadge');
 const weatherIcon       = $('weatherIcon');
 const weatherTemp       = $('weatherTemp');
 const weatherDesc       = $('weatherDesc');
+const weatherLocationModeEl = $('weatherLocationMode');
+const weatherManualPanel = $('weatherManualPanel');
+const weatherManualInput = $('weatherManualInput');
+const weatherManualApply = $('weatherManualApply');
 const logoWrap          = $('logoWrap');
 const logoEditBtn       = $('logoEditBtn');
 const logoOverlay       = $('logoOverlay');
@@ -240,6 +250,10 @@ async function init() {
       searchEngine: typeof stored?.searchEngine === 'string' ? stored.searchEngine : 'google',
       theme: ['dark', 'light', 'system'].includes(stored?.theme) ? stored.theme : 'system',
       shortcutsView: ['grid', 'list'].includes(stored?.shortcutsView) ? stored.shortcutsView : 'grid',
+      weatherLocationMode: ['geolocation', 'manual'].includes(stored?.weatherLocationMode)
+        ? stored.weatherLocationMode
+        : 'geolocation',
+      weatherManualText: typeof stored?.weatherManualText === 'string' ? stored.weatherManualText : '',
     };
     shortcuts = result.shortcuts?.length ? result.shortcuts : DEFAULT_SHORTCUTS;
 
@@ -255,6 +269,7 @@ async function init() {
   applyTheme();
   renderSearchEngineOptions();
   renderThemeSelect();
+  syncWeatherLocationUI();
   await loadLogo();
   await loadNotes();
   await loadNotesVisibility();
@@ -289,6 +304,39 @@ function applyTheme() {
 
 function renderThemeSelect() {
   themeSelect.value = settings.theme || 'system';
+}
+
+function syncWeatherManualPanelVisibility() {
+  if (!weatherManualPanel) return;
+  weatherManualPanel.hidden = settings.weatherLocationMode !== 'manual';
+}
+
+function syncWeatherLocationUI() {
+  if (weatherLocationModeEl) weatherLocationModeEl.value = settings.weatherLocationMode || 'geolocation';
+  if (weatherManualInput) weatherManualInput.value = settings.weatherManualText || '';
+  syncWeatherManualPanelVisibility();
+}
+
+async function onWeatherLocationModeChange() {
+  if (!weatherLocationModeEl) return;
+  settings.weatherLocationMode = weatherLocationModeEl.value;
+  syncWeatherManualPanelVisibility();
+  try {
+    await chrome.storage.local.remove(WEATHER_CACHE_KEY);
+  } catch { /* ignore */ }
+  await persist();
+  await loadWeatherFromCache();
+  loadWeather();
+}
+
+async function applyManualWeatherLocation() {
+  if (!weatherManualInput) return;
+  settings.weatherManualText = weatherManualInput.value.trim();
+  await persist();
+  try {
+    await chrome.storage.local.remove(WEATHER_CACHE_KEY);
+  } catch { /* ignore */ }
+  await loadWeather({ manualAttempt: true });
 }
 
 // ─── Logo ───────────────────────────────────────────────────────────────────
@@ -1111,6 +1159,40 @@ function getLocation() {
   });
 }
 
+/** Parse "lat, lon" or "lat lon" in decimal degrees. */
+function parseLatLonInput(text) {
+  const m = String(text).trim().match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]+\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]);
+  const lon = parseFloat(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
+}
+
+async function geocodeOpenMeteo(query) {
+  const q = query.trim();
+  if (!q) return null;
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const json = await res.json();
+  const r = json.results?.[0];
+  if (!r || typeof r.latitude !== 'number' || typeof r.longitude !== 'number') return null;
+  return { lat: r.latitude, lon: r.longitude };
+}
+
+async function resolveWeatherLocation() {
+  if (settings.weatherLocationMode === 'manual') {
+    const raw = (settings.weatherManualText || '').trim();
+    if (!raw) return null;
+    const coords = parseLatLonInput(raw);
+    if (coords) return coords;
+    return geocodeOpenMeteo(raw);
+  }
+  return getLocation();
+}
+
 async function fetchWeather(lat, lon) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto&temperature_unit=fahrenheit`;
   const res = await fetch(url);
@@ -1124,10 +1206,23 @@ async function fetchWeather(lat, lon) {
   };
 }
 
-async function loadWeather() {
+function clearManualWeatherDisplay() {
+  document.documentElement.removeAttribute('data-weather');
+  if (weatherBadge) weatherBadge.hidden = true;
+  clearWeatherAnimations();
+}
+
+async function loadWeather(options = {}) {
+  const manualAttempt = options.manualAttempt === true;
   try {
-    const loc = await getLocation();
-    if (!loc) return;
+    const loc = await resolveWeatherLocation();
+    if (!loc) {
+      if (settings.weatherLocationMode === 'manual') {
+        clearManualWeatherDisplay();
+        if (manualAttempt && weatherManualInput) shake(weatherManualInput);
+      }
+      return;
+    }
     const data = await fetchWeather(loc.lat, loc.lon);
     const themeKey = wmoToTheme(data.weather_code);
     applyWeatherTheme(themeKey);
@@ -1136,7 +1231,11 @@ async function loadWeather() {
     await chrome.storage.local.set({
       [WEATHER_CACHE_KEY]: { data, at: Date.now() },
     });
-  } catch { /* ignore */ }
+  } catch {
+    if (settings.weatherLocationMode === 'manual' && manualAttempt && weatherManualInput) {
+      shake(weatherManualInput);
+    }
+  }
 }
 
 // ─── Weather Animations ────────────────────────────────────────────────────────
@@ -2430,6 +2529,12 @@ function restoreFromBackup(file) {
         if (typeof data.settings.searchEngine === 'string') settings.searchEngine = data.settings.searchEngine;
         if (['dark', 'light', 'system'].includes(data.settings.theme)) settings.theme = data.settings.theme;
         if (['grid', 'list'].includes(data.settings.shortcutsView)) settings.shortcutsView = data.settings.shortcutsView;
+        if (['geolocation', 'manual'].includes(data.settings.weatherLocationMode)) {
+          settings.weatherLocationMode = data.settings.weatherLocationMode;
+        }
+        if (typeof data.settings.weatherManualText === 'string') {
+          settings.weatherManualText = data.settings.weatherManualText;
+        }
       }
       if (typeof data.notes === 'string' && notesText) {
         notesText.value = data.notes;
@@ -2444,7 +2549,9 @@ function restoreFromBackup(file) {
       applyTheme();
       renderSearchEngineOptions();
       renderThemeSelect();
+      syncWeatherLocationUI();
       renderGroups();
+      loadWeather();
     } catch (e) {
       alert('Invalid backup file. Please choose a valid JSON backup.');
     }
@@ -2520,6 +2627,18 @@ themeSelect.addEventListener('change', () => {
   applyTheme();
   persist();
 });
+
+if (weatherLocationModeEl) {
+  weatherLocationModeEl.addEventListener('change', () => onWeatherLocationModeChange());
+}
+if (weatherManualApply) {
+  weatherManualApply.addEventListener('click', () => applyManualWeatherLocation());
+}
+if (weatherManualInput) {
+  weatherManualInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') applyManualWeatherLocation();
+  });
+}
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
