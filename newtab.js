@@ -89,6 +89,18 @@ const themeSelect       = $('themeSelect');
 const backupBtn         = $('backupBtn');
 const restoreBtn        = $('restoreBtn');
 const restoreInput      = $('restoreInput');
+const fromTabsBtn       = $('fromTabsBtn');
+const tabsOverlay       = $('tabsOverlay');
+const tabsCloseBtn      = $('tabsCloseBtn');
+const tabsSkipPinned    = $('tabsSkipPinned');
+const tabsSelectAllBtn  = $('tabsSelectAllBtn');
+const tabsSelectNoneBtn = $('tabsSelectNoneBtn');
+const tabsRefreshBtn    = $('tabsRefreshBtn');
+const tabsListContainer = $('tabsListContainer');
+const tabsEmptyMsg      = $('tabsEmptyMsg');
+const fTabsGroup        = $('fTabsGroup');
+const tabsCancelBtn     = $('tabsCancelBtn');
+const tabsAddBtn        = $('tabsAddBtn');
 const notesText         = $('notesText');
 const notesSection      = $('notesSection');
 const notesToggle       = $('notesToggle');
@@ -1015,10 +1027,13 @@ function bindBackgroundEvents() {
   if (unsplashCancelBtn) unsplashCancelBtn.addEventListener('click', closeUnsplashModal);
   if (unsplashOverlay) unsplashOverlay.addEventListener('click', (e) => { if (e.target === unsplashOverlay) closeUnsplashModal(); });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (bgOverlay && bgOverlay.classList.contains('open')) closeBackgroundModal();
-      if (unsplashOverlay && unsplashOverlay.classList.contains('open')) closeUnsplashModal();
+    if (e.key !== 'Escape') return;
+    if (tabsOverlay?.classList.contains('open')) {
+      closeTabsImportModal();
+      return;
     }
+    if (bgOverlay && bgOverlay.classList.contains('open')) closeBackgroundModal();
+    else if (unsplashOverlay && unsplashOverlay.classList.contains('open')) closeUnsplashModal();
   });
 }
 
@@ -1677,15 +1692,20 @@ async function deleteGroup() {
   closeGroupModal();
 }
 
-function populateGroupSelect() {
-  fGroup.innerHTML = '';
+function fillGroupSelect(selectEl) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
   const sorted = [...groups].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   sorted.forEach(g => {
     const opt = document.createElement('option');
     opt.value = g.id;
     opt.textContent = g.name;
-    fGroup.appendChild(opt);
+    selectEl.appendChild(opt);
   });
+}
+
+function populateGroupSelect() {
+  fillGroupSelect(fGroup);
 }
 
 // ─── Modal ───────────────────────────────────────────────────────────────────
@@ -1771,6 +1791,158 @@ async function deleteShortcut() {
   await persist();
   renderGroups();
   closeModal();
+}
+
+// ─── Import from open tabs ───────────────────────────────────────────────────
+
+function normalisedUrlKey(url) {
+  const n = normaliseUrl(String(url || '').trim());
+  if (!n) return '';
+  try {
+    const u = new URL(n);
+    u.hash = '';
+    return u.href.toLowerCase();
+  } catch {
+    return n.toLowerCase();
+  }
+}
+
+function existingShortcutUrlKeys() {
+  const set = new Set();
+  shortcuts.forEach((s) => {
+    const k = normalisedUrlKey(s.url);
+    if (k) set.add(k);
+  });
+  return set;
+}
+
+async function refreshTabsImportList() {
+  if (!tabsListContainer || !tabsEmptyMsg) return;
+  tabsListContainer.innerHTML = '';
+  const skipPinned = tabsSkipPinned?.checked === true;
+  let tabList = [];
+  try {
+    tabList = await chrome.tabs.query({});
+  } catch {
+    tabsEmptyMsg.hidden = false;
+    tabsEmptyMsg.textContent = 'Could not read tabs. Check that the extension has permission.';
+    return;
+  }
+
+  const existing = existingShortcutUrlKeys();
+  tabList.sort((a, b) => {
+    if (a.windowId !== b.windowId) return a.windowId - b.windowId;
+    return (a.index ?? 0) - (b.index ?? 0);
+  });
+
+  const batchSeen = new Set();
+  const rows = [];
+  for (const tab of tabList) {
+    if (!tab.url || !/^https?:\/\//i.test(tab.url)) continue;
+    if (skipPinned && tab.pinned) continue;
+    const key = normalisedUrlKey(tab.url);
+    if (!key || existing.has(key) || batchSeen.has(key)) continue;
+    batchSeen.add(key);
+    rows.push(tab);
+  }
+
+  if (!rows.length) {
+    tabsEmptyMsg.hidden = false;
+    tabsEmptyMsg.textContent =
+      'No tabs to show. Open some http(s) sites, or uncheck “Skip pinned tabs”, or remove duplicates already saved as shortcuts.';
+    return;
+  }
+
+  tabsEmptyMsg.hidden = true;
+  for (const tab of rows) {
+    const row = document.createElement('div');
+    row.className = 'tabs-import-row';
+    row.setAttribute('role', 'listitem');
+    row.dataset.url = tab.url;
+
+    const title = (tab.title || '').trim() || hostnameFromUrl(tab.url) || 'Untitled';
+
+    row.innerHTML = `
+      <label class="tabs-import-check-label">
+        <input type="checkbox" class="tabs-import-check" />
+      </label>
+      <div class="tabs-import-fields">
+        <input type="text" class="tabs-import-name" spellcheck="false" autocomplete="off" />
+        <span class="tabs-import-host"></span>
+      </div>
+    `;
+    row.querySelector('.tabs-import-name').value = title;
+    const hostEl = row.querySelector('.tabs-import-host');
+    const host = hostnameFromUrl(tab.url);
+    hostEl.textContent = host;
+    tabsListContainer.appendChild(row);
+  }
+}
+
+function openTabsImportModal() {
+  if (!tabsOverlay) return;
+  closeModal();
+  closeGroupModal();
+  fillGroupSelect(fTabsGroup);
+  const first = groups.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0];
+  if (fTabsGroup && first) fTabsGroup.value = first.id;
+  if (tabsSkipPinned) tabsSkipPinned.checked = false;
+  tabsOverlay.classList.add('open');
+  refreshTabsImportList().then(() => {
+    const firstCheck = tabsListContainer?.querySelector('.tabs-import-check');
+    if (firstCheck) firstCheck.focus();
+  });
+}
+
+function closeTabsImportModal() {
+  if (tabsOverlay) tabsOverlay.classList.remove('open');
+}
+
+async function addSelectedTabsAsShortcuts() {
+  if (!fTabsGroup || !tabsListContainer) return;
+  const groupId = fTabsGroup.value || groups[0]?.id;
+  if (!groupId) return;
+
+  const rows = tabsListContainer.querySelectorAll('.tabs-import-row');
+  const toAdd = [];
+  for (const row of rows) {
+    const cb = row.querySelector('.tabs-import-check');
+    if (!cb?.checked) continue;
+    const nameInput = row.querySelector('.tabs-import-name');
+    const url = row.dataset.url;
+    const name = nameInput?.value.trim() ?? '';
+    if (!name) {
+      if (nameInput) {
+        nameInput.focus();
+        shake(nameInput);
+      }
+      return;
+    }
+    const nu = normaliseUrl(url);
+    if (!nu) continue;
+    toAdd.push({ name, url: nu });
+  }
+
+  if (!toAdd.length) return;
+
+  let order = shortcutsForGroup(groupId).length;
+  let colorIdx = shortcuts.length;
+  for (const item of toAdd) {
+    shortcuts.push({
+      id: uid(),
+      groupId,
+      order: order++,
+      name: item.name,
+      url: item.url,
+      color: SWATCHES[colorIdx % SWATCHES.length],
+      svg: '',
+    });
+    colorIdx += 1;
+  }
+
+  await persist();
+  renderGroups();
+  closeTabsImportModal();
 }
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
@@ -2038,7 +2210,36 @@ function bindEvents() {
   });
 
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (tabsOverlay?.classList.contains('open')) {
+      closeTabsImportModal();
+      return;
+    }
+    if (overlay.classList.contains('open')) closeModal();
+  });
+
+  if (fromTabsBtn) fromTabsBtn.addEventListener('click', () => openTabsImportModal());
+  if (tabsCloseBtn) tabsCloseBtn.addEventListener('click', () => closeTabsImportModal());
+  if (tabsCancelBtn) tabsCancelBtn.addEventListener('click', () => closeTabsImportModal());
+  if (tabsAddBtn) tabsAddBtn.addEventListener('click', () => addSelectedTabsAsShortcuts());
+  if (tabsOverlay) {
+    tabsOverlay.addEventListener('click', (e) => {
+      if (e.target === tabsOverlay) closeTabsImportModal();
+    });
+  }
+  if (tabsSkipPinned) tabsSkipPinned.addEventListener('change', () => refreshTabsImportList());
+  if (tabsRefreshBtn) tabsRefreshBtn.addEventListener('click', () => refreshTabsImportList());
+  if (tabsSelectAllBtn) {
+    tabsSelectAllBtn.addEventListener('click', () => {
+      tabsListContainer?.querySelectorAll('.tabs-import-check').forEach((c) => { c.checked = true; });
+    });
+  }
+  if (tabsSelectNoneBtn) {
+    tabsSelectNoneBtn.addEventListener('click', () => {
+      tabsListContainer?.querySelectorAll('.tabs-import-check').forEach((c) => { c.checked = false; });
+    });
+  }
 
   document.addEventListener('keydown', e => {
     if (overlay.classList.contains('open') && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {

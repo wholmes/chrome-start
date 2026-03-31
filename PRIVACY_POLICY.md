@@ -15,7 +15,7 @@ All data is stored **locally** on your device using Chrome's `chrome.storage.loc
 The following data is stored locally:
 - **Shortcuts and Groups**: Your custom links, icons, colors, and organizational groups
 - **Notes**: Text content you enter in the notes section
-- **Settings**: Theme preference, search engine choice, weather animation toggle
+- **Settings**: Theme preference, search engine choice, shortcuts layout (grid/list), weather animation toggle
 - **Logo**: Custom SVG logo (if you add one)
 - **Background Images**: Images you upload or select from Unsplash (stored as data URLs)
 - **Unsplash API Key**: Your personal Unsplash API key (if you provide one)
@@ -42,6 +42,10 @@ This extension does not require you to create an account or provide any personal
 - **Purpose**: To search and display photos from Unsplash as background images
 - **Privacy**: This feature is **completely optional**. You must provide your own Unsplash API key to use it. We do not store or transmit your API key to any server except Unsplash's API when you use the feature.
 - **Usage**: Unsplash features are only active when you explicitly open the Unsplash browser and provide your API key.
+
+## Open tabs (optional shortcut import)
+
+When you click **From open tabs**, the extension uses Chrome’s `tabs` permission to read **URLs and titles** of your open tabs so you can pick which sites to save as shortcuts. That data is processed **only on your device** to build the list in the dialog. It is **not** sent to our servers (we do not operate any servers) or to any third party. Only **http** and **https** tabs are offered; you can skip pinned tabs and edit each name before saving.
 
 ## Data Transmission
 
@@ -82,4 +86,4 @@ This extension complies with:
 
 ---
 
-**Summary**: This extension stores all data locally on your device. The only external data transmission is: (1) location coordinates to Open-Meteo for weather (with your permission), and (2) Unsplash API requests when you use the optional Unsplash feature (with your API key). No data is sent to our servers because we don't operate any servers.
+**Summary**: This extension stores all data locally on your device. The only external data transmission is: (1) location coordinates to Open-Meteo for weather (with your permission), and (2) Unsplash API requests when you use the optional Unsplash feature (with your API key). Reading open-tab URLs and titles for **From open tabs** stays on your device. No data is sent to our servers because we don't operate any servers.

@@ -1302,6 +1302,130 @@ body:has(.bg-slideshow[style*="display: block"]) {
   width: 360px;
 }
 
+.modal.modal-wide {
+  width: min(560px, 100%);
+}
+
+.tabs-import-hint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted-mid);
+  margin: 0;
+}
+
+.tabs-import-hint strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.field-inline-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-inline-check .label {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.field-inline-check input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.tabs-import-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.btn-ghost-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.tabs-import-list {
+  max-height: min(42vh, 320px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+}
+
+.tabs-import-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs-import-row:last-child {
+  border-bottom: none;
+}
+
+.tabs-import-check-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.tabs-import-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.tabs-import-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tabs-import-name {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 300;
+  padding: 8px 10px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.tabs-import-name:focus {
+  border-color: rgba(232, 201, 122, 0.4);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.tabs-import-host {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabs-import-empty {
+  font-size: 13px;
+  color: var(--muted-mid);
+  margin: 0;
+  text-align: center;
+  padding: 20px 12px;
+}
+
 /* Modal parts */
 .modal-head {
   display: flex;
