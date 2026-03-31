@@ -390,6 +390,7 @@ async function init() {
   bindLogoEvents();
   bindBackgroundEvents();
   bindWeatherAnimEvents();
+  await loadLayoutPanelWelcomeState();
   bindLayoutPanelEvents();
   applySectionVisibility();
   syncSectionPanelCheckboxes();
@@ -440,6 +441,7 @@ function setSectionVisible(key, visible) {
 
 let layoutPanelOpen = false;
 let layoutPanelLastFocus = null;
+let layoutWelcomeDismissed = false;
 
 function setLayoutPanelExpanded(expanded) {
   if (layoutPanelBtn) layoutPanelBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -454,7 +456,22 @@ function openLayoutPanel() {
   sidePanelRoot.setAttribute('aria-hidden', 'false');
   setLayoutPanelExpanded(true);
   syncSectionPanelCheckboxes();
-  sidePanelCloseBtn?.focus();
+  const welcome = $('layoutPanelWelcome');
+  if (welcome) {
+    if (layoutWelcomeDismissed) {
+      welcome.hidden = true;
+      welcome.setAttribute('aria-hidden', 'true');
+    } else {
+      welcome.hidden = false;
+      welcome.removeAttribute('aria-hidden');
+    }
+  }
+  const welcomeDismiss = $('layoutPanelWelcomeDismiss');
+  if (!layoutWelcomeDismissed && welcomeDismiss) {
+    welcomeDismiss.focus();
+  } else {
+    sidePanelCloseBtn?.focus();
+  }
 }
 
 function closeLayoutPanel() {
@@ -491,6 +508,22 @@ function bindLayoutPanelEvents() {
         e.stopPropagation();
         closeLayoutPanel();
       }
+    });
+  }
+  const layoutWelcomeDismiss = $('layoutPanelWelcomeDismiss');
+  if (layoutWelcomeDismiss) {
+    layoutWelcomeDismiss.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissLayoutPanelWelcome();
+    });
+  }
+  const replayTipsBtn = $('replayTipsBtn');
+  if (replayTipsBtn) {
+    replayTipsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      replayFirstRunTips();
     });
   }
 }
@@ -2730,6 +2763,41 @@ async function persist() {
 // ─── First-run tips & undo toast ─────────────────────────────────────────────
 
 const HINT_FIRST_RUN_KEY = 'hintFirstRunTipsDismissed';
+const HINT_LAYOUT_PANEL_WELCOME_KEY = 'hintLayoutPanelWelcomeDismissed';
+
+async function loadLayoutPanelWelcomeState() {
+  try {
+    const r = await chrome.storage.local.get([HINT_LAYOUT_PANEL_WELCOME_KEY]);
+    layoutWelcomeDismissed = !!r[HINT_LAYOUT_PANEL_WELCOME_KEY];
+  } catch {
+    layoutWelcomeDismissed = false;
+  }
+}
+
+function dismissLayoutPanelWelcome() {
+  layoutWelcomeDismissed = true;
+  const el = $('layoutPanelWelcome');
+  if (el) {
+    el.hidden = true;
+    el.setAttribute('aria-hidden', 'true');
+  }
+  try {
+    void chrome.storage.local.set({ [HINT_LAYOUT_PANEL_WELCOME_KEY]: true });
+  } catch { /* ignore */ }
+  sidePanelCloseBtn?.focus();
+}
+
+function replayFirstRunTips() {
+  const el = $('firstRunTip');
+  if (!el) return;
+  el.hidden = false;
+  el.removeAttribute('aria-hidden');
+  closeLayoutPanel();
+  requestAnimationFrame(() => {
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    $('firstRunTipDismiss')?.focus();
+  });
+}
 
 let undoOfferTimer = null;
 /** @type {null | (() => Promise<void>)} */

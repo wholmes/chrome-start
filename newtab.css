@@ -2538,14 +2538,25 @@ input[type="color"] {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
 }
 
-.first-run-tip-text {
-  margin: 0;
+.first-run-tip-copy {
   flex: 1;
   min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.first-run-tip-text {
+  margin: 0;
   font-size: 13px;
   line-height: 1.5;
   color: var(--text);
   font-weight: 300;
+}
+
+.first-run-tip-text--secondary {
+  font-size: 12px;
+  color: var(--muted-mid);
 }
 
 .first-run-tip-text strong {
@@ -2704,12 +2715,90 @@ input[type="color"] {
   -webkit-overflow-scrolling: touch;
 }
 
+.layout-panel-welcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 14px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-active);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-dim);
+}
+
+.layout-panel-welcome[hidden] {
+  display: none !important;
+}
+
+.layout-panel-welcome-text {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+  font-size: 12px;
+  line-height: 1.55;
+  font-weight: 300;
+  color: var(--text);
+}
+
+.layout-panel-welcome-dismiss {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-active);
+  background: var(--surface-hover);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.layout-panel-welcome-dismiss:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
 .side-panel-block {
   margin-bottom: 26px;
 }
 
 .side-panel-block:last-child {
   margin-bottom: 0;
+}
+
+.side-panel-foot {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.side-panel-text-btn {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 300;
+  color: var(--muted-mid);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--muted-mid) 55%, transparent);
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.side-panel-text-btn:hover {
+  color: var(--text);
+  text-decoration-color: color-mix(in srgb, var(--accent) 70%, var(--text));
 }
 
 .side-panel-block-title {

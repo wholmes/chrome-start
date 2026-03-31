@@ -49,12 +49,18 @@
 
     <div class="first-run-tip" id="firstRunTip" hidden role="region" aria-label="Getting started tips">
       <div class="first-run-tip-inner">
-        <p class="first-run-tip-text">
-          <strong>Quick tips:</strong> Open <strong>Layout</strong> (top bar) to show or hide sections, set theme, and weather location.
-          Press <kbd class="kbd-inline">/</kbd> to focus the shortcut filter,
-          <kbd class="kbd-inline">1</kbd>–<kbd class="kbd-inline">9</kbd> to open the first nine visible links,
-          and <kbd class="kbd-inline">[</kbd> / <kbd class="kbd-inline">]</kbd> to jump between groups.
-        </p>
+        <div class="first-run-tip-copy">
+          <p class="first-run-tip-text">
+            <strong>Welcome.</strong> Use <strong>Layout</strong> in the top bar to show or hide sections, set theme, and weather.
+            If the bar is hidden, use the round <strong>Layout</strong> control at the lower corner.
+          </p>
+          <p class="first-run-tip-text first-run-tip-text--secondary">
+            <strong>Shortcuts:</strong>
+            <kbd class="kbd-inline">/</kbd> to filter;
+            <kbd class="kbd-inline">1</kbd>–<kbd class="kbd-inline">9</kbd> for the first nine tiles;
+            <kbd class="kbd-inline">[</kbd> and <kbd class="kbd-inline">]</kbd> to move between groups.
+          </p>
+        </div>
         <button type="button" class="first-run-tip-dismiss" id="firstRunTipDismiss">Got it</button>
       </div>
     </div>
@@ -222,6 +228,12 @@
         </button>
       </div>
       <div class="side-panel-body">
+        <div class="layout-panel-welcome" id="layoutPanelWelcome" hidden role="note" aria-label="Layout panel introduction">
+          <p class="layout-panel-welcome-text">
+            Choose what appears on the page here. Logo and background stay in the top bar when it is visible; otherwise use the floating layout control.
+          </p>
+          <button type="button" class="layout-panel-welcome-dismiss" id="layoutPanelWelcomeDismiss">Okay</button>
+        </div>
         <div class="side-panel-block">
           <h3 class="side-panel-block-title">Sections</h3>
           <p class="side-panel-hint">Show or hide parts of the new tab page.</p>
@@ -282,6 +294,9 @@
             </div>
             <p class="weather-manual-hint" id="weatherManualHint">City names use Open-Meteo search. Coordinates: latitude, longitude (decimal degrees).</p>
           </div>
+        </div>
+        <div class="side-panel-foot">
+          <button type="button" class="side-panel-text-btn" id="replayTipsBtn">Show quick tips on the page</button>
         </div>
       </div>
     </aside>
