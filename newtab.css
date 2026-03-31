@@ -1318,13 +1318,17 @@ body:has(.bg-slideshow[style*="display: block"]) {
   font-weight: 500;
 }
 
-.field-inline-check {
+/* Must beat `.field { flex-direction: column }` (defined later in this file) */
+.field.field-inline-check {
   flex-direction: row;
   align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  text-align: left;
   gap: 10px;
 }
 
-.field-inline-check .label {
+.field.field-inline-check .label {
   text-transform: none;
   letter-spacing: 0.02em;
   font-size: 13px;
@@ -1332,8 +1336,9 @@ body:has(.bg-slideshow[style*="display: block"]) {
   cursor: pointer;
 }
 
-.field-inline-check input {
+.field.field-inline-check input {
   width: auto;
+  flex-shrink: 0;
   accent-color: var(--accent);
 }
 
@@ -1342,6 +1347,7 @@ body:has(.bg-slideshow[style*="display: block"]) {
   flex-wrap: wrap;
   gap: 8px 12px;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .btn-ghost-sm {
