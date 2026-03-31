@@ -21,6 +21,25 @@ const SEARCH_ENGINES = [
 
 const DEFAULT_GROUP_IDS = { work: 'work', personal: 'personal' };
 
+const DEFAULT_SECTIONS = {
+  header: true,
+  search: true,
+  notes: true,
+  shortcuts: true,
+  footer: true,
+};
+
+/** @param {Record<string, unknown> | undefined} raw */
+function normaliseSections(raw) {
+  return {
+    header: raw?.header !== false,
+    search: raw?.search !== false,
+    notes: raw?.notes !== false,
+    shortcuts: raw?.shortcuts !== false,
+    footer: raw?.footer !== false,
+  };
+}
+
 const DEFAULT_GROUPS = [
   { id: DEFAULT_GROUP_IDS.work, name: 'Work', order: 0, parentId: null },
   { id: DEFAULT_GROUP_IDS.personal, name: 'Personal', order: 1, parentId: null },
@@ -56,6 +75,7 @@ let settings = {
   shortcutsView: 'grid',
   weatherLocationMode: 'geolocation',
   weatherManualText: '',
+  sections: { ...DEFAULT_SECTIONS },
 };
 let editingId = null;
 let editingGroupId = null;
@@ -96,6 +116,26 @@ const groupDeleteBtn  = $('groupDeleteBtn');
 const fGroupName      = $('fGroupName');
 const groupModalHeading = $('groupModalHeading');
 const themeSelect       = $('themeSelect');
+const layoutPanelBtn    = $('layoutPanelBtn');
+const layoutFab         = $('layoutFab');
+const logoBar           = $('logoBar');
+const sidePanelRoot     = $('sidePanelRoot');
+const sidePanel         = $('sidePanel');
+const sidePanelBackdrop = $('sidePanelBackdrop');
+const sidePanelCloseBtn = $('sidePanelCloseBtn');
+const pageHeaderSection = $('pageHeaderSection');
+const searchSectionWrap = $('searchSectionWrap');
+const pageFooter        = $('pageFooter');
+const firstRunTip       = $('firstRunTip');
+const firstRunTipDismiss = $('firstRunTipDismiss');
+const undoToast         = $('undoToast');
+const undoToastMsg      = $('undoToastMsg');
+const undoToastBtn      = $('undoToastBtn');
+const sectionToggleHeader    = $('sectionToggleHeader');
+const sectionToggleSearch    = $('sectionToggleSearch');
+const sectionToggleNotes     = $('sectionToggleNotes');
+const sectionToggleShortcuts = $('sectionToggleShortcuts');
+const sectionToggleFooter    = $('sectionToggleFooter');
 const backupBtn         = $('backupBtn');
 const restoreBtn        = $('restoreBtn');
 const restoreInput      = $('restoreInput');
@@ -128,7 +168,6 @@ const notesText         = $('notesText');
 const notesSection      = $('notesSection');
 const notesToggle       = $('notesToggle');
 const weatherAnimToggle = $('weatherAnimToggle');
-const weatherAnimToggleFixed = $('weatherAnimToggleFixed');
 const weatherAnimations = $('weatherAnimations');
 const notesContent       = $('notesContent');
 const weatherBadge      = $('weatherBadge');
@@ -149,6 +188,8 @@ const logoClearBtn      = $('logoClearBtn');
 const fLogoSvg          = $('fLogoSvg');
 const logoPreview       = $('logoPreview');
 const bgSlideshow       = $('bgSlideshow');
+const bgStage           = $('bgStage');
+const bgBrandOverlay    = $('bgBrandOverlay');
 const bgEditBtn         = $('bgEditBtn');
 const bgOverlay         = $('bgOverlay');
 const bgCloseBtn        = $('bgCloseBtn');
@@ -161,6 +202,17 @@ const bgImageList       = $('bgImageList');
 const bgTransition       = $('bgTransition');
 const bgDuration        = $('bgDuration');
 const bgTransitionSpeed = $('bgTransitionSpeed');
+const bgBrandEnabled    = $('bgBrandEnabled');
+const bgBrandColor1     = $('bgBrandColor1');
+const bgBrandColor2     = $('bgBrandColor2');
+const bgBrandAlpha1     = $('bgBrandAlpha1');
+const bgBrandAlpha2     = $('bgBrandAlpha2');
+const bgBrandAlpha1Val  = $('bgBrandAlpha1Val');
+const bgBrandAlpha2Val  = $('bgBrandAlpha2Val');
+const bgBrandSplit      = $('bgBrandSplit');
+const bgBrandSplitVal   = $('bgBrandSplitVal');
+const bgBrandAngle      = $('bgBrandAngle');
+const bgBrandFields     = $('bgBrandFields');
 const bgUnsplashBtn      = $('bgUnsplashBtn');
 const unsplashOverlay    = $('unsplashOverlay');
 const unsplashCloseBtn   = $('unsplashCloseBtn');
@@ -181,6 +233,53 @@ const BG_STORAGE_KEY = 'bgSlideshow';
 const BG_DEFAULT_DURATION = 8;
 const BG_DEFAULT_TRANSITION = 'fade';
 const BG_DEFAULT_TRANSITION_SPEED = 2;
+
+const BG_DEFAULT_BRAND = {
+  enabled: false,
+  color1: '#e8c97a',
+  color2: '#3d4f6f',
+  alpha1: 45,
+  alpha2: 45,
+  /** 1–100: second color stop position (% along line). 100 = blend across full length (legacy look). */
+  split: 100,
+  angle: 135,
+};
+
+/** @param {string} hex @param {[number, number, number]} [fallback] */
+function brandHexToRgb(hex, fallback = [232, 201, 122]) {
+  if (typeof hex !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return fallback;
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** @param {Record<string, unknown> | null | undefined} raw */
+function normaliseBrand(raw) {
+  const d = BG_DEFAULT_BRAND;
+  if (!raw || typeof raw !== 'object') {
+    return { ...d };
+  }
+  const enabled = !!raw.enabled;
+  const color1 = typeof raw.color1 === 'string' && /^#[0-9A-Fa-f]{6}$/.test(raw.color1) ? raw.color1 : d.color1;
+  const color2 = typeof raw.color2 === 'string' && /^#[0-9A-Fa-f]{6}$/.test(raw.color2) ? raw.color2 : d.color2;
+  const legacyStrength = Number(raw.strength);
+  let alpha1 = Number(raw.alpha1);
+  let alpha2 = Number(raw.alpha2);
+  if (!Number.isFinite(alpha1)) {
+    alpha1 = Number.isFinite(legacyStrength) ? legacyStrength : d.alpha1;
+  }
+  if (!Number.isFinite(alpha2)) {
+    alpha2 = Number.isFinite(legacyStrength) ? legacyStrength : d.alpha2;
+  }
+  alpha1 = Math.min(100, Math.max(0, alpha1));
+  alpha2 = Math.min(100, Math.max(0, alpha2));
+  let split = Number(raw.split);
+  if (!Number.isFinite(split)) split = d.split;
+  split = Math.min(100, Math.max(1, Math.round(split)));
+  let angle = Number(raw.angle);
+  if (!Number.isFinite(angle)) angle = d.angle;
+  angle = ((Math.round(angle) % 360) + 360) % 360;
+  return { enabled, color1, color2, alpha1, alpha2, split, angle };
+}
 const UNSPLASH_API_KEY_STORAGE_KEY = 'unsplashApiKey';
 const UNSPLASH_API_BASE = 'https://api.unsplash.com';
 
@@ -254,6 +353,7 @@ async function init() {
         ? stored.weatherLocationMode
         : 'geolocation',
       weatherManualText: typeof stored?.weatherManualText === 'string' ? stored.weatherManualText : '',
+      sections: normaliseSections(stored?.sections),
     };
     shortcuts = result.shortcuts?.length ? result.shortcuts : DEFAULT_SHORTCUTS;
 
@@ -290,6 +390,11 @@ async function init() {
   bindLogoEvents();
   bindBackgroundEvents();
   bindWeatherAnimEvents();
+  bindLayoutPanelEvents();
+  applySectionVisibility();
+  syncSectionPanelCheckboxes();
+  await loadFirstRunTip();
+  bindFirstRunHintAndUndo();
 }
 
 function applyTheme() {
@@ -303,7 +408,91 @@ function applyTheme() {
 }
 
 function renderThemeSelect() {
-  themeSelect.value = settings.theme || 'system';
+  if (themeSelect) themeSelect.value = settings.theme || 'system';
+}
+
+function applySectionVisibility() {
+  const s = settings.sections || DEFAULT_SECTIONS;
+  if (logoBar) logoBar.hidden = !s.header;
+  if (pageHeaderSection) pageHeaderSection.hidden = !s.header;
+  if (layoutFab) layoutFab.hidden = !!s.header;
+  if (searchSectionWrap) searchSectionWrap.hidden = !s.search;
+  if (notesSection) notesSection.hidden = !s.notes;
+  if (shortcutsSection) shortcutsSection.hidden = !s.shortcuts;
+  if (pageFooter) pageFooter.hidden = !s.footer;
+}
+
+function syncSectionPanelCheckboxes() {
+  const s = settings.sections || DEFAULT_SECTIONS;
+  if (sectionToggleHeader) sectionToggleHeader.checked = !!s.header;
+  if (sectionToggleSearch) sectionToggleSearch.checked = !!s.search;
+  if (sectionToggleNotes) sectionToggleNotes.checked = !!s.notes;
+  if (sectionToggleShortcuts) sectionToggleShortcuts.checked = !!s.shortcuts;
+  if (sectionToggleFooter) sectionToggleFooter.checked = !!s.footer;
+}
+
+function setSectionVisible(key, visible) {
+  if (!settings.sections) settings.sections = { ...DEFAULT_SECTIONS };
+  settings.sections[key] = !!visible;
+  persist();
+  applySectionVisibility();
+}
+
+let layoutPanelOpen = false;
+let layoutPanelLastFocus = null;
+
+function setLayoutPanelExpanded(expanded) {
+  if (layoutPanelBtn) layoutPanelBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  if (layoutFab) layoutFab.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+}
+
+function openLayoutPanel() {
+  if (!sidePanelRoot || !sidePanel) return;
+  layoutPanelLastFocus = document.activeElement;
+  layoutPanelOpen = true;
+  sidePanelRoot.classList.add('is-open');
+  sidePanelRoot.setAttribute('aria-hidden', 'false');
+  setLayoutPanelExpanded(true);
+  syncSectionPanelCheckboxes();
+  sidePanelCloseBtn?.focus();
+}
+
+function closeLayoutPanel() {
+  if (!sidePanelRoot) return;
+  layoutPanelOpen = false;
+  sidePanelRoot.classList.remove('is-open');
+  sidePanelRoot.setAttribute('aria-hidden', 'true');
+  setLayoutPanelExpanded(false);
+  if (layoutPanelLastFocus && typeof layoutPanelLastFocus.focus === 'function') {
+    layoutPanelLastFocus.focus();
+  }
+  layoutPanelLastFocus = null;
+}
+
+function bindLayoutPanelEvents() {
+  if (layoutPanelBtn) layoutPanelBtn.addEventListener('click', () => openLayoutPanel());
+  if (layoutFab) layoutFab.addEventListener('click', () => openLayoutPanel());
+  if (sidePanelCloseBtn) sidePanelCloseBtn.addEventListener('click', () => closeLayoutPanel());
+  if (sidePanelBackdrop) {
+    sidePanelBackdrop.addEventListener('click', () => closeLayoutPanel());
+  }
+  const onSectionToggle = (el, key) => {
+    if (!el) return;
+    el.addEventListener('change', () => setSectionVisible(key, el.checked));
+  };
+  onSectionToggle(sectionToggleHeader, 'header');
+  onSectionToggle(sectionToggleSearch, 'search');
+  onSectionToggle(sectionToggleNotes, 'notes');
+  onSectionToggle(sectionToggleShortcuts, 'shortcuts');
+  onSectionToggle(sectionToggleFooter, 'footer');
+  if (sidePanel) {
+    sidePanel.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        closeLayoutPanel();
+      }
+    });
+  }
 }
 
 function syncWeatherManualPanelVisibility() {
@@ -430,10 +619,86 @@ let bgSlideshowData = {
   transition: BG_DEFAULT_TRANSITION,
   duration: BG_DEFAULT_DURATION,
   transitionSpeed: BG_DEFAULT_TRANSITION_SPEED,
+  brand: normaliseBrand(null),
 };
 let bgSlideshowInterval = null;
 let bgCurrentIndex = 0;
 let bgEditingImages = []; // Array of { url, attribution }
+
+function getBrandFromForm() {
+  if (!bgBrandEnabled || !bgOverlay?.classList.contains('open')) {
+    return normaliseBrand(bgSlideshowData.brand);
+  }
+  return normaliseBrand({
+    enabled: bgBrandEnabled.checked,
+    color1: bgBrandColor1?.value,
+    color2: bgBrandColor2?.value,
+    alpha1: bgBrandAlpha1?.value,
+    alpha2: bgBrandAlpha2?.value,
+    split: bgBrandSplit?.value,
+    angle: bgBrandAngle?.value,
+  });
+}
+
+function syncBgBrandAlphaLabels() {
+  if (bgBrandAlpha1Val && bgBrandAlpha1) bgBrandAlpha1Val.textContent = `${bgBrandAlpha1.value}%`;
+  if (bgBrandAlpha2Val && bgBrandAlpha2) bgBrandAlpha2Val.textContent = `${bgBrandAlpha2.value}%`;
+}
+
+function syncBgBrandSplitLabel() {
+  if (bgBrandSplitVal && bgBrandSplit) bgBrandSplitVal.textContent = `${bgBrandSplit.value}%`;
+}
+
+function syncBgBrandFieldsInteractivity() {
+  if (!bgBrandFields) return;
+  const on = !!bgBrandEnabled?.checked;
+  bgBrandFields.classList.toggle('bg-brand-controls--disabled', !on);
+}
+
+function refreshBackgroundModalBrandPreview() {
+  syncBgBrandAlphaLabels();
+  syncBgBrandSplitLabel();
+  syncBgBrandFieldsInteractivity();
+  if (bgOverlay?.classList.contains('open')) previewBackgroundSlideshow();
+}
+
+/**
+ * @param {ReturnType<typeof normaliseBrand>} brand
+ * @param {boolean} hasImages
+ */
+function applyBrandOverlayForState(brand, hasImages) {
+  const b = normaliseBrand(brand);
+  if (!bgBrandOverlay) return;
+
+  if (!b.enabled) {
+    bgBrandOverlay.hidden = true;
+    bgBrandOverlay.style.background = '';
+    if (!hasImages) {
+      document.body.style.background = 'var(--bg)';
+    }
+    return;
+  }
+
+  const [r1, g1, b1] = brandHexToRgb(b.color1, [232, 201, 122]);
+  const [r2, g2, b2] = brandHexToRgb(b.color2, [61, 79, 111]);
+  const a1 = Math.min(1, Math.max(0, b.alpha1 / 100));
+  const a2 = Math.min(1, Math.max(0, b.alpha2 / 100));
+  const splitPct = Math.min(100, Math.max(1, b.split));
+  const grad =
+    `linear-gradient(${b.angle}deg, rgba(${r1},${g1},${b1},${a1}) 0%, rgba(${r2},${g2},${b2},${a2}) ${splitPct}%)`;
+
+  if (hasImages) {
+    document.body.style.background = 'transparent';
+    bgBrandOverlay.hidden = false;
+    bgBrandOverlay.style.background = grad;
+    return;
+  }
+
+  document.body.style.background = 'var(--bg)';
+  document.documentElement.removeAttribute('data-bg-bright');
+  bgBrandOverlay.hidden = false;
+  bgBrandOverlay.style.background = grad;
+}
 
 async function loadBackgroundSlideshow() {
   try {
@@ -452,6 +717,7 @@ async function loadBackgroundSlideshow() {
         transition: stored.transition || BG_DEFAULT_TRANSITION,
         duration: stored.duration || BG_DEFAULT_DURATION,
         transitionSpeed: stored.transitionSpeed || BG_DEFAULT_TRANSITION_SPEED,
+        brand: normaliseBrand(stored.brand),
       };
     }
     renderBackgroundSlideshow();
@@ -471,9 +737,9 @@ function renderBackgroundSlideshow() {
   const images = bgSlideshowData.images || [];
   if (images.length === 0) {
     bgSlideshow.style.display = 'none';
-    document.body.style.background = 'var(--bg)';
     document.documentElement.removeAttribute('data-bg-bright');
     hidePhotoCredit();
+    applyBrandOverlayForState(normaliseBrand(bgSlideshowData.brand), false);
     return;
   }
   bgSlideshow.style.display = 'block';
@@ -505,6 +771,7 @@ function renderBackgroundSlideshow() {
     if (i === (bgCurrentIndex + 1) % images.length) img.classList.add('next');
     bgSlideshow.appendChild(img);
   });
+  applyBrandOverlayForState(normaliseBrand(bgSlideshowData.brand), true);
 }
 
 // ─── Image Brightness Detection ────────────────────────────────────────────
@@ -595,9 +862,9 @@ function previewBackgroundSlideshow() {
   console.log('Preview function called with', previewImages.length, 'images');
   if (previewImages.length === 0) {
     bgSlideshow.style.display = 'none';
-    document.body.style.background = 'var(--bg)';
     document.documentElement.removeAttribute('data-bg-bright');
     hidePhotoCredit();
+    applyBrandOverlayForState(getBrandFromForm(), false);
     return;
   }
   bgSlideshow.innerHTML = '';
@@ -675,6 +942,7 @@ function previewBackgroundSlideshow() {
     visibility: window.getComputedStyle(bgSlideshow).visibility,
     zIndex: window.getComputedStyle(bgSlideshow).zIndex
   });
+  applyBrandOverlayForState(getBrandFromForm(), true);
 }
 
 function startBackgroundSlideshow() {
@@ -724,12 +992,25 @@ function openBackgroundModal() {
   bgTransition.value = bgSlideshowData.transition;
   bgDuration.value = bgSlideshowData.duration;
   bgTransitionSpeed.value = bgSlideshowData.transitionSpeed;
+  const br = normaliseBrand(bgSlideshowData.brand);
+  if (bgBrandEnabled) bgBrandEnabled.checked = br.enabled;
+  if (bgBrandColor1) bgBrandColor1.value = br.color1;
+  if (bgBrandColor2) bgBrandColor2.value = br.color2;
+  if (bgBrandAlpha1) bgBrandAlpha1.value = String(br.alpha1);
+  if (bgBrandAlpha2) bgBrandAlpha2.value = String(br.alpha2);
+  if (bgBrandSplit) bgBrandSplit.value = String(br.split);
+  if (bgBrandAngle) bgBrandAngle.value = String(br.angle);
+  syncBgBrandAlphaLabels();
+  syncBgBrandSplitLabel();
+  syncBgBrandFieldsInteractivity();
   renderBackgroundImageList();
-  // Show preview of existing images when modal opens
+  bgOverlay.classList.add('open');
+  // Show preview of existing images when modal opens, or brand-only background
   if (bgEditingImages.length > 0) {
     previewBackgroundSlideshow();
+  } else {
+    applyBrandOverlayForState(getBrandFromForm(), false);
   }
-  bgOverlay.classList.add('open');
   setTimeout(() => bgImageInput?.focus(), 60);
 }
 
@@ -817,6 +1098,7 @@ async function saveBackgroundSettings() {
   bgSlideshowData.transition = bgTransition.value || BG_DEFAULT_TRANSITION;
   bgSlideshowData.duration = Number(bgDuration.value) || BG_DEFAULT_DURATION;
   bgSlideshowData.transitionSpeed = Number(bgTransitionSpeed.value) || BG_DEFAULT_TRANSITION_SPEED;
+  bgSlideshowData.brand = normaliseBrand(getBrandFromForm());
   await persistBackgroundSlideshow();
   bgCurrentIndex = 0;
   console.log('Saving slideshow with', bgSlideshowData.images.length, 'images');
@@ -1067,6 +1349,17 @@ function bindBackgroundEvents() {
   if (bgClearBtn) bgClearBtn.addEventListener('click', clearBackgroundSlideshow);
   if (bgAddBtn) bgAddBtn.addEventListener('click', () => bgImageInput?.click());
   if (bgImageInput) bgImageInput.addEventListener('change', handleBackgroundImageAdd);
+  if (bgBrandEnabled) bgBrandEnabled.addEventListener('change', refreshBackgroundModalBrandPreview);
+  [bgBrandColor1, bgBrandColor2].forEach((el) => {
+    if (el) el.addEventListener('input', refreshBackgroundModalBrandPreview);
+  });
+  if (bgBrandAlpha1) bgBrandAlpha1.addEventListener('input', refreshBackgroundModalBrandPreview);
+  if (bgBrandAlpha2) bgBrandAlpha2.addEventListener('input', refreshBackgroundModalBrandPreview);
+  if (bgBrandSplit) bgBrandSplit.addEventListener('input', refreshBackgroundModalBrandPreview);
+  if (bgBrandAngle) {
+    bgBrandAngle.addEventListener('input', refreshBackgroundModalBrandPreview);
+    bgBrandAngle.addEventListener('change', refreshBackgroundModalBrandPreview);
+  }
   if (bgUnsplashBtn) bgUnsplashBtn.addEventListener('click', openUnsplashModal);
   if (bgOverlay) bgOverlay.addEventListener('click', (e) => { if (e.target === bgOverlay) closeBackgroundModal(); });
   if (unsplashSearchBtn) unsplashSearchBtn.addEventListener('click', handleUnsplashSearch);
@@ -1097,6 +1390,10 @@ function bindBackgroundEvents() {
   if (unsplashOverlay) unsplashOverlay.addEventListener('click', (e) => { if (e.target === unsplashOverlay) closeUnsplashModal(); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (layoutPanelOpen) {
+      closeLayoutPanel();
+      return;
+    }
     if (tabsOverlay?.classList.contains('open')) {
       closeTabsImportModal();
       return;
@@ -1922,6 +2219,9 @@ async function saveGroup() {
 async function deleteGroup() {
   if (!editingGroupId) return;
   if (groups.length <= 1) return;
+  const groupsSnap = groups.map((g) => ({ ...g }));
+  const shortcutsSnap = shortcuts.map((s) => ({ ...s }));
+
   groups.filter((g) => g.parentId === editingGroupId).forEach((c) => {
     c.parentId = null;
   });
@@ -1939,6 +2239,14 @@ async function deleteGroup() {
   renderGroups();
   populateGroupSelect();
   closeGroupModal();
+
+  offerUndo('Group removed', async () => {
+    groups = groupsSnap.map((g) => ({ ...g }));
+    shortcuts = shortcutsSnap.map((s) => ({ ...s }));
+    await persist();
+    renderGroups();
+    populateGroupSelect();
+  });
 }
 
 function fillGroupSelect(selectEl) {
@@ -2041,10 +2349,19 @@ async function saveShortcut() {
 
 async function deleteShortcut() {
   if (!editingId) return;
-  shortcuts = shortcuts.filter(x => x.id !== editingId);
+  const idx = shortcuts.findIndex((x) => x.id === editingId);
+  if (idx === -1) return;
+  const removed = { ...shortcuts[idx] };
+  shortcuts = shortcuts.filter((x) => x.id !== editingId);
   await persist();
   renderGroups();
   closeModal();
+
+  offerUndo('Shortcut removed', async () => {
+    shortcuts.splice(idx, 0, removed);
+    await persist();
+    renderGroups();
+  });
 }
 
 // ─── Import from open tabs ───────────────────────────────────────────────────
@@ -2353,7 +2670,7 @@ function isTypingInField(el) {
 }
 
 function isAnyDialogOpen() {
-  return !!document.querySelector('.overlay.open');
+  return !!document.querySelector('.overlay.open') || !!sidePanelRoot?.classList.contains('is-open');
 }
 
 function bindKeyboardShortcutsNav() {
@@ -2364,6 +2681,7 @@ function bindKeyboardShortcutsNav() {
     if (e.key === '/') {
       if (isTypingInField(ae) && ae !== shortcutFilter) return;
       if (isAnyDialogOpen()) return;
+      if (shortcutsSection?.hidden) return;
       e.preventDefault();
       shortcutFilter?.focus();
       shortcutFilter?.select();
@@ -2407,6 +2725,92 @@ async function persist() {
   try {
     await chrome.storage.local.set({ shortcuts, groups, settings });
   } catch { /* dev */ }
+}
+
+// ─── First-run tips & undo toast ─────────────────────────────────────────────
+
+const HINT_FIRST_RUN_KEY = 'hintFirstRunTipsDismissed';
+
+let undoOfferTimer = null;
+/** @type {null | (() => Promise<void>)} */
+let undoOfferRun = null;
+
+function dismissUndoOffer() {
+  if (undoOfferTimer) {
+    clearTimeout(undoOfferTimer);
+    undoOfferTimer = null;
+  }
+  undoOfferRun = null;
+  const toast = undoToast || $('undoToast');
+  if (toast) toast.hidden = true;
+}
+
+function offerUndo(message, run) {
+  dismissUndoOffer();
+  undoOfferRun = run;
+  const msgEl = undoToastMsg || $('undoToastMsg');
+  const toast = undoToast || $('undoToast');
+  if (msgEl) msgEl.textContent = message;
+  if (toast) toast.hidden = false;
+  undoOfferTimer = setTimeout(() => dismissUndoOffer(), 8000);
+}
+
+async function runUndoFromToast() {
+  if (!undoOfferRun) return;
+  const fn = undoOfferRun;
+  dismissUndoOffer();
+  await fn();
+}
+
+async function loadFirstRunTip() {
+  try {
+    const r = await chrome.storage.local.get([HINT_FIRST_RUN_KEY]);
+    if (r[HINT_FIRST_RUN_KEY]) return;
+    const el = document.getElementById('firstRunTip');
+    if (el) {
+      el.hidden = false;
+      el.removeAttribute('aria-hidden');
+    }
+  } catch { /* ignore */ }
+}
+
+function dismissFirstRunTip() {
+  const el = document.getElementById('firstRunTip');
+  if (el) {
+    el.hidden = true;
+    el.setAttribute('aria-hidden', 'true');
+  }
+  try {
+    void chrome.storage.local.set({ [HINT_FIRST_RUN_KEY]: true });
+  } catch { /* ignore */ }
+}
+
+function bindFirstRunHintAndUndo() {
+  const tipBtn = document.getElementById('firstRunTipDismiss');
+  if (tipBtn) {
+    tipBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissFirstRunTip();
+    });
+  }
+  const undoBtn = document.getElementById('undoToastBtn');
+  if (undoBtn) {
+    undoBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      runUndoFromToast();
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    const toast = undoToast || $('undoToast');
+    if (!undoOfferRun || !toast || toast.hidden) return;
+    if (isTypingInField(document.activeElement)) return;
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      runUndoFromToast();
+    }
+  });
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
@@ -2535,6 +2939,9 @@ function restoreFromBackup(file) {
         if (typeof data.settings.weatherManualText === 'string') {
           settings.weatherManualText = data.settings.weatherManualText;
         }
+        if (data.settings.sections && typeof data.settings.sections === 'object') {
+          settings.sections = normaliseSections(data.settings.sections);
+        }
       }
       if (typeof data.notes === 'string' && notesText) {
         notesText.value = data.notes;
@@ -2550,6 +2957,8 @@ function restoreFromBackup(file) {
       renderSearchEngineOptions();
       renderThemeSelect();
       syncWeatherLocationUI();
+      applySectionVisibility();
+      syncSectionPanelCheckboxes();
       renderGroups();
       loadWeather();
     } catch (e) {
@@ -2622,11 +3031,13 @@ searchEngineEl.addEventListener('change', () => {
   persist();
 });
 
-themeSelect.addEventListener('change', () => {
-  settings.theme = themeSelect.value;
-  applyTheme();
-  persist();
-});
+if (themeSelect) {
+  themeSelect.addEventListener('change', () => {
+    settings.theme = themeSelect.value;
+    applyTheme();
+    persist();
+  });
+}
 
 if (weatherLocationModeEl) {
   weatherLocationModeEl.addEventListener('change', () => onWeatherLocationModeChange());
@@ -2692,6 +3103,10 @@ function bindEvents() {
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (layoutPanelOpen) {
+      closeLayoutPanel();
+      return;
+    }
     if (tabsOverlay?.classList.contains('open')) {
       closeTabsImportModal();
       return;
