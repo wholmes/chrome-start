@@ -110,6 +110,26 @@
 
     <!-- Shortcuts by group -->
     <section class="shortcuts-section" id="shortcutsSection">
+      <div class="shortcuts-filter-row">
+        <label class="shortcuts-filter-label" for="shortcutFilter">
+          <svg class="shortcuts-filter-ico" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="8.5" cy="8.5" r="5.75" stroke="currentColor" stroke-width="1.25"/>
+            <path d="M13 13L17.5 17.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+          </svg>
+          <span class="visually-hidden">Filter shortcuts</span>
+        </label>
+        <input
+          id="shortcutFilter"
+          class="shortcuts-filter-input"
+          type="search"
+          placeholder="Filter shortcuts by name, URL, or group…"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="shortcutFilterHint"
+        />
+        <kbd class="shortcuts-filter-kbd" title="Focus this filter">/</kbd>
+      </div>
+      <p class="shortcuts-filter-hint" id="shortcutFilterHint">Press <kbd class="kbd-inline">/</kbd> to focus. Keys <kbd class="kbd-inline">1</kbd>–<kbd class="kbd-inline">9</kbd> open matching links. <kbd class="kbd-inline">[</kbd> <kbd class="kbd-inline">]</kbd> jump between groups.</p>
       <div class="shortcuts-view-bar" id="shortcutsViewBar">
         <span class="shortcuts-view-label" id="shortcutsViewLabel">Shortcuts layout</span>
         <div class="shortcuts-view-toggle" role="group" aria-labelledby="shortcutsViewLabel">
@@ -133,6 +153,9 @@
         </button>
         <button type="button" class="add-fab add-fab-ghost" id="fromTabsBtn" title="Add shortcuts from tabs you have open">
           From open tabs
+        </button>
+        <button type="button" class="add-fab add-fab-ghost" id="fromBookmarksBtn" title="Add shortcuts from Chrome bookmarks">
+          From bookmarks
         </button>
         <span class="section-actions-divider" aria-hidden="true">·</span>
         <button type="button" class="add-fab add-fab-ghost" id="backupBtn" title="Download backup of shortcuts and groups">
@@ -244,6 +267,13 @@
           <span class="label">Group name</span>
           <input id="fGroupName" type="text" placeholder="e.g. Work, Personal" autocomplete="off" />
         </label>
+        <label class="field">
+          <span class="label">Inside folder</span>
+          <select id="fGroupParent" class="field-select" aria-label="Parent group (top-level folder only)">
+            <option value="">Top level</option>
+          </select>
+        </label>
+        <p class="field-hint">Subgroups sit under one top-level folder only (single nesting level).</p>
       </div>
       <div class="modal-foot">
         <button class="btn-danger" id="groupDeleteBtn" style="visibility:hidden">Delete group</button>
@@ -288,6 +318,40 @@
         <div class="foot-actions">
           <button type="button" class="btn-ghost" id="tabsCancelBtn">Cancel</button>
           <button type="button" class="btn-primary" id="tabsAddBtn">Add selected</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import from bookmarks -->
+  <div class="overlay" id="bookmarksOverlay" role="dialog" aria-modal="true" aria-labelledby="bookmarksModalHeading">
+    <div class="modal modal-wide" id="bookmarksModal">
+      <div class="modal-head">
+        <h2 class="modal-title" id="bookmarksModalHeading">From bookmarks</h2>
+        <button class="icon-btn" type="button" id="bookmarksCloseBtn" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="tabs-import-hint">Only <strong>http</strong> and <strong>https</strong> bookmarks are listed. URLs already saved as shortcuts are hidden. Folder path is shown under each title.</p>
+        <div class="tabs-import-toolbar">
+          <button type="button" class="btn-ghost btn-ghost-sm" id="bookmarksSelectAllBtn">Select all</button>
+          <button type="button" class="btn-ghost btn-ghost-sm" id="bookmarksSelectNoneBtn">Select none</button>
+          <button type="button" class="btn-ghost btn-ghost-sm" id="bookmarksRefreshBtn">Refresh list</button>
+        </div>
+        <label class="field">
+          <span class="label">Add to group</span>
+          <select id="fBookmarksGroup" class="field-select"></select>
+        </label>
+        <div class="tabs-import-list" id="bookmarksListContainer" role="list"></div>
+        <p class="tabs-import-empty" id="bookmarksEmptyMsg" hidden>No bookmarks to import.</p>
+      </div>
+      <div class="modal-foot">
+        <div class="foot-actions">
+          <button type="button" class="btn-ghost" id="bookmarksCancelBtn">Cancel</button>
+          <button type="button" class="btn-primary" id="bookmarksAddBtn">Add selected</button>
         </div>
       </div>
     </div>

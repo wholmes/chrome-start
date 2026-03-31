@@ -47,6 +47,10 @@ This extension does not require you to create an account or provide any personal
 
 When you click **From open tabs**, the extension uses Chrome’s `tabs` permission to read **URLs and titles** of your open tabs so you can pick which sites to save as shortcuts. That data is processed **only on your device** to build the list in the dialog. It is **not** sent to our servers (we do not operate any servers) or to any third party. Only **http** and **https** tabs are offered; you can skip pinned tabs and edit each name before saving.
 
+## Bookmarks (optional shortcut import)
+
+When you click **From bookmarks**, the extension uses Chrome’s `bookmarks` permission to read your **bookmark tree** (titles, URLs, and folder names) so you can choose which bookmarks to add as shortcuts. That data is processed **only on your device** in the dialog. It is **not** sent to our servers or any third party. Only **http** and **https** bookmarks are listed.
+
 ## Data Transmission
 
 - **Weather API**: Your location coordinates are sent to Open-Meteo when you grant location permission. This happens automatically when the extension loads and checks for weather.
@@ -86,4 +90,4 @@ This extension complies with:
 
 ---
 
-**Summary**: This extension stores all data locally on your device. The only external data transmission is: (1) location coordinates to Open-Meteo for weather (with your permission), and (2) Unsplash API requests when you use the optional Unsplash feature (with your API key). Reading open-tab URLs and titles for **From open tabs** stays on your device. No data is sent to our servers because we don't operate any servers.
+**Summary**: This extension stores all data locally on your device. The only external data transmission is: (1) location coordinates to Open-Meteo for weather (with your permission), and (2) Unsplash API requests when you use the optional Unsplash feature (with your API key). **From open tabs** and **From bookmarks** only read data on your device to show pick lists; nothing is sent to us. No data is sent to our servers because we don't operate any servers.

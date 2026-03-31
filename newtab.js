@@ -22,8 +22,8 @@ const SEARCH_ENGINES = [
 const DEFAULT_GROUP_IDS = { work: 'work', personal: 'personal' };
 
 const DEFAULT_GROUPS = [
-  { id: DEFAULT_GROUP_IDS.work, name: 'Work', order: 0 },
-  { id: DEFAULT_GROUP_IDS.personal, name: 'Personal', order: 1 },
+  { id: DEFAULT_GROUP_IDS.work, name: 'Work', order: 0, parentId: null },
+  { id: DEFAULT_GROUP_IDS.personal, name: 'Personal', order: 1, parentId: null },
 ];
 
 // Default shortcuts with groupId and order (fill="currentColor" SVGs)
@@ -53,6 +53,10 @@ let groups   = [];
 let settings = { searchEngine: 'google', theme: 'system', shortcutsView: 'grid' };
 let editingId = null;
 let editingGroupId = null;
+let newGroupDefaultParentId = null;
+let shortcutFilterDebounce = null;
+/** @type {HTMLElement[]} */
+let keyboardShortcutTargets = [];
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 
@@ -101,6 +105,19 @@ const tabsEmptyMsg      = $('tabsEmptyMsg');
 const fTabsGroup        = $('fTabsGroup');
 const tabsCancelBtn     = $('tabsCancelBtn');
 const tabsAddBtn        = $('tabsAddBtn');
+const shortcutFilter    = $('shortcutFilter');
+const fGroupParent      = $('fGroupParent');
+const fromBookmarksBtn  = $('fromBookmarksBtn');
+const bookmarksOverlay  = $('bookmarksOverlay');
+const bookmarksCloseBtn = $('bookmarksCloseBtn');
+const bookmarksCancelBtn = $('bookmarksCancelBtn');
+const bookmarksAddBtn   = $('bookmarksAddBtn');
+const bookmarksListContainer = $('bookmarksListContainer');
+const bookmarksEmptyMsg = $('bookmarksEmptyMsg');
+const fBookmarksGroup   = $('fBookmarksGroup');
+const bookmarksSelectAllBtn = $('bookmarksSelectAllBtn');
+const bookmarksSelectNoneBtn = $('bookmarksSelectNoneBtn');
+const bookmarksRefreshBtn = $('bookmarksRefreshBtn');
 const notesText         = $('notesText');
 const notesSection      = $('notesSection');
 const notesToggle       = $('notesToggle');
@@ -227,10 +244,12 @@ async function init() {
     shortcuts = result.shortcuts?.length ? result.shortcuts : DEFAULT_SHORTCUTS;
 
     migrateLegacyShortcuts();
+    migrateGroupsParentId();
     if (!result.groups?.length || !result.shortcuts?.length) persist();
   } catch {
     groups = DEFAULT_GROUPS.slice();
     shortcuts = DEFAULT_SHORTCUTS.slice();
+    migrateGroupsParentId();
   }
 
   applyTheme();
@@ -248,6 +267,8 @@ async function init() {
     applyUnsplashScreenshotDemo();
   }
   renderGroups();
+  bindShortcutFilter();
+  bindKeyboardShortcutsNav();
   bindEvents();
   bindGroupModalEvents();
   bindNotesEvents();
@@ -1032,6 +1053,10 @@ function bindBackgroundEvents() {
       closeTabsImportModal();
       return;
     }
+    if (bookmarksOverlay?.classList.contains('open')) {
+      closeBookmarksImportModal();
+      return;
+    }
     if (bgOverlay && bgOverlay.classList.contains('open')) closeBackgroundModal();
     else if (unsplashOverlay && unsplashOverlay.classList.contains('open')) closeUnsplashModal();
   });
@@ -1275,6 +1300,56 @@ function migrateLegacyShortcuts() {
   if (changed) persist();
 }
 
+function migrateGroupsParentId() {
+  const ids = new Set(groups.map((g) => g.id));
+  groups.forEach((g) => {
+    if (g.parentId === undefined) g.parentId = null;
+    if (g.parentId && !ids.has(g.parentId)) g.parentId = null;
+    if (g.parentId === g.id) g.parentId = null;
+  });
+  groups.forEach((g) => {
+    if (!g.parentId) return;
+    const parent = groups.find((p) => p.id === g.parentId);
+    if (parent?.parentId) g.parentId = null;
+  });
+}
+
+function groupById(id) {
+  return groups.find((g) => g.id === id);
+}
+
+function topLevelGroupsSorted() {
+  return groups.filter((g) => g.parentId == null).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+function childGroupsSorted(parentId) {
+  return groups.filter((g) => g.parentId === parentId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+function shortcutMatchesFilter(s, filterRaw) {
+  const q = (filterRaw || '').trim().toLowerCase();
+  if (!q) return true;
+  const g = groupById(s.groupId);
+  const hay = [s.name, s.url, g?.name].filter(Boolean).map((x) => x.toLowerCase());
+  if (g?.parentId) {
+    const p = groupById(g.parentId);
+    if (p?.name) hay.push(p.name.toLowerCase());
+  }
+  return hay.some((h) => h.includes(q));
+}
+
+function populateParentGroupSelect() {
+  if (!fGroupParent) return;
+  fGroupParent.innerHTML = '<option value="">Top level</option>';
+  topLevelGroupsSorted().forEach((g) => {
+    if (g.id === editingGroupId) return;
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = g.name;
+    fGroupParent.appendChild(opt);
+  });
+}
+
 // ─── Clock ───────────────────────────────────────────────────────────────────
 
 function startClock() {
@@ -1334,18 +1409,25 @@ function shortcutsForGroup(groupId) {
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
-function createGroupHeader(grp) {
+function createGroupHeader(grp, opts = {}) {
+  const nested = !!opts.nested;
+  const showAddSubgroup = !!opts.showAddSubgroup;
+  const subBtn = showAddSubgroup
+    ? `<button type="button" class="add-fab add-fab-sm add-subgroup" title="Add subgroup under this folder" data-parent-id="${grp.id}">Subgroup</button>`
+    : '';
   const header = document.createElement('div');
   header.className = 'group-header';
+  if (nested) header.classList.add('group-header--nested');
   header.innerHTML = `
       <div class="group-title-row">
         <h3 class="group-title" data-group-id="${grp.id}">${escapeHtml(grp.name)}</h3>
         <div class="group-header-actions">
           <button type="button" class="icon-btn icon-btn-sm group-move group-move-up" title="Move group up" aria-label="Move group up" data-group-id="${grp.id}">▲</button>
           <button type="button" class="icon-btn icon-btn-sm group-move group-move-down" title="Move group down" aria-label="Move group down" data-group-id="${grp.id}">▼</button>
-          <button type="button" class="icon-btn icon-btn-sm group-edit" title="Edit group name" aria-label="Edit group" data-group-id="${grp.id}">
+          <button type="button" class="icon-btn icon-btn-sm group-edit" title="Edit group" aria-label="Edit group" data-group-id="${grp.id}">
             <svg viewBox="0 0 24 24" fill="none" width="12" height="12"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
+          ${subBtn}
           <button type="button" class="add-fab add-fab-sm add-shortcut-in-group" title="Add shortcut here" data-group-id="${grp.id}">+</button>
         </div>
       </div>
@@ -1364,23 +1446,40 @@ function syncShortcutsViewUI() {
   }
 }
 
-function renderGroups() {
-  groupsContainer.innerHTML = '';
-  syncShortcutsViewUI();
-  const sortedGroups = [...groups].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const listView = settings.shortcutsView === 'list';
+function attachGridDnD(grid) {
+  grid.addEventListener('dragover', onShortcutDragOver);
+  grid.addEventListener('drop', onShortcutDrop);
+  grid.addEventListener('dragenter', onShortcutDragEnter);
+  grid.addEventListener('dragleave', onShortcutDragLeave);
+}
 
-  sortedGroups.forEach((grp) => {
-    const section = document.createElement('section');
-    section.className = listView ? 'group-section group-section--list' : 'group-section';
-    section.dataset.groupId = grp.id;
-    section.appendChild(createGroupHeader(grp));
+function renderOneGroupSection(grp, listView, filterRaw) {
+  const q = (filterRaw || '').trim();
+  const allItems = shortcutsForGroup(grp.id);
+  const items = q ? allItems.filter((s) => shortcutMatchesFilter(s, q)) : allItems;
+  const childSections = childGroupsSorted(grp.id)
+    .map((c) => renderOneGroupSection(c, listView, filterRaw))
+    .filter(Boolean);
 
+  if (q) {
+    if (items.length === 0 && childSections.length === 0) return null;
+  }
+
+  const section = document.createElement('section');
+  section.className = listView ? 'group-section group-section--list' : 'group-section';
+  if (grp.parentId) section.classList.add('group-section--nested');
+  section.dataset.groupId = grp.id;
+
+  const isTop = grp.parentId == null;
+  section.appendChild(createGroupHeader(grp, { nested: !isTop, showAddSubgroup: isTop }));
+
+  const showGrid = items.length > 0 || !q;
+  if (showGrid) {
     if (listView) {
       const ul = document.createElement('ul');
       ul.className = 'shortcuts-list';
       ul.setAttribute('role', 'list');
-      shortcutsForGroup(grp.id).forEach((s) => {
+      items.forEach((s) => {
         ul.appendChild(createShortcutListRow(s));
       });
       section.appendChild(ul);
@@ -1389,18 +1488,38 @@ function renderGroups() {
       grid.className = 'shortcuts-grid group-grid';
       grid.dataset.groupId = grp.id;
       grid.setAttribute('role', 'list');
-      grid.addEventListener('dragover', onShortcutDragOver);
-      grid.addEventListener('drop', onShortcutDrop);
-      grid.addEventListener('dragenter', onShortcutDragEnter);
-      grid.addEventListener('dragleave', onShortcutDragLeave);
-      shortcutsForGroup(grp.id).forEach((s) => {
+      attachGridDnD(grid);
+      items.forEach((s) => {
         grid.appendChild(createShortcutCard(s, grid));
       });
       section.appendChild(grid);
     }
+  }
 
-    groupsContainer.appendChild(section);
+  childSections.forEach((el) => section.appendChild(el));
+  return section;
+}
+
+function rebuildKeyboardShortcutOrder() {
+  keyboardShortcutTargets = [];
+  if (!groupsContainer) return;
+  groupsContainer.querySelectorAll('a.shortcut-card, a.shortcut-list-link').forEach((el) => {
+    if (el.offsetParent === null) return;
+    keyboardShortcutTargets.push(el);
   });
+}
+
+function renderGroups() {
+  groupsContainer.innerHTML = '';
+  syncShortcutsViewUI();
+  const listView = settings.shortcutsView === 'list';
+  const filterRaw = shortcutFilter?.value ?? '';
+
+  topLevelGroupsSorted().forEach((grp) => {
+    const el = renderOneGroupSection(grp, listView, filterRaw);
+    if (el) groupsContainer.appendChild(el);
+  });
+  rebuildKeyboardShortcutOrder();
 }
 
 function escapeHtml(str) {
@@ -1622,27 +1741,41 @@ function onShortcutDrop(e) {
 // ─── Group header actions ────────────────────────────────────────────────────
 
 function moveGroup(groupId, dir) {
-  const idx = groups.findIndex(g => g.id === groupId);
-  if (idx === -1) return;
+  const g = groups.find((x) => x.id === groupId);
+  if (!g) return;
+  const pid = g.parentId ?? null;
+  const sibs = groups
+    .filter((x) => (x.parentId ?? null) === pid)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const idx = sibs.findIndex((x) => x.id === groupId);
   const next = dir === 'up' ? idx - 1 : idx + 1;
-  if (next < 0 || next >= groups.length) return;
-  [groups[idx].order, groups[next].order] = [groups[next].order, groups[idx].order];
-  groups.forEach((g, i) => { g.order = i; });
+  if (next < 0 || next >= sibs.length) return;
+  const oa = sibs[idx].order ?? 0;
+  const ob = sibs[next].order ?? 0;
+  sibs[idx].order = ob;
+  sibs[next].order = oa;
   persist();
   renderGroups();
 }
 
-function openGroupModal(id = null) {
+function openGroupModal(id = null, defaultParentId = null) {
   editingGroupId = id;
+  newGroupDefaultParentId = defaultParentId || null;
+  populateParentGroupSelect();
   if (id) {
-    const g = groups.find(x => x.id === id);
+    const g = groups.find((x) => x.id === id);
     if (!g) return;
-    groupModalHeading.textContent = 'Edit group';
+    groupModalHeading.textContent = g.parentId ? 'Edit subgroup' : 'Edit group';
     fGroupName.value = g.name;
-    groupDeleteBtn.style.visibility = groups.length > 1 ? 'visible' : 'hidden';
+    if (fGroupParent) fGroupParent.value = g.parentId || '';
+    const canDelete = groups.length > 1;
+    groupDeleteBtn.style.visibility = canDelete ? 'visible' : 'hidden';
   } else {
-    groupModalHeading.textContent = 'New group';
+    groupModalHeading.textContent = defaultParentId ? 'New subgroup' : 'New group';
     fGroupName.value = '';
+    if (fGroupParent) {
+      fGroupParent.value = defaultParentId || '';
+    }
     groupDeleteBtn.style.visibility = 'hidden';
   }
   groupOverlay.classList.add('open');
@@ -1652,6 +1785,7 @@ function openGroupModal(id = null) {
 function closeGroupModal() {
   groupOverlay.classList.remove('open');
   editingGroupId = null;
+  newGroupDefaultParentId = null;
 }
 
 async function saveGroup() {
@@ -1661,11 +1795,24 @@ async function saveGroup() {
     shake(fGroupName);
     return;
   }
+  let parentId = fGroupParent?.value || null;
+  if (parentId === '') parentId = null;
+  if (parentId) {
+    const p = groups.find((x) => x.id === parentId);
+    if (!p || p.parentId != null) parentId = null;
+  }
+  if (parentId === editingGroupId) parentId = null;
+
   if (editingGroupId) {
-    const g = groups.find(x => x.id === editingGroupId);
-    if (g) g.name = name;
+    const g = groups.find((x) => x.id === editingGroupId);
+    if (g) {
+      g.name = name;
+      g.parentId = parentId;
+    }
   } else {
-    groups.push({ id: uid(), name, order: groups.length });
+    const siblings = groups.filter((x) => (x.parentId ?? null) === (parentId ?? null));
+    const maxO = siblings.reduce((m, x) => Math.max(m, x.order ?? 0), -1);
+    groups.push({ id: uid(), name, parentId, order: maxO + 1 });
   }
   await persist();
   renderGroups();
@@ -1676,16 +1823,19 @@ async function saveGroup() {
 async function deleteGroup() {
   if (!editingGroupId) return;
   if (groups.length <= 1) return;
-  const firstId = groups.find(g => g.id !== editingGroupId)?.id;
+  groups.filter((g) => g.parentId === editingGroupId).forEach((c) => {
+    c.parentId = null;
+  });
+  const firstId = groups.find((g) => g.id !== editingGroupId)?.id;
   if (firstId) {
-    shortcuts.forEach(s => {
+    shortcuts.forEach((s) => {
       if (s.groupId === editingGroupId) {
         s.groupId = firstId;
-        s.order = shortcuts.filter(x => x.groupId === firstId).length + (s.order ?? 0);
+        s.order = shortcuts.filter((x) => x.groupId === firstId).length + (s.order ?? 0);
       }
     });
   }
-  groups = groups.filter(g => g.id !== editingGroupId);
+  groups = groups.filter((g) => g.id !== editingGroupId);
   await persist();
   renderGroups();
   populateGroupSelect();
@@ -1695,12 +1845,17 @@ async function deleteGroup() {
 function fillGroupSelect(selectEl) {
   if (!selectEl) return;
   selectEl.innerHTML = '';
-  const sorted = [...groups].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  sorted.forEach(g => {
+  topLevelGroupsSorted().forEach((g) => {
     const opt = document.createElement('option');
     opt.value = g.id;
     opt.textContent = g.name;
     selectEl.appendChild(opt);
+    childGroupsSorted(g.id).forEach((c) => {
+      const o2 = document.createElement('option');
+      o2.value = c.id;
+      o2.textContent = `  ${c.name}`;
+      selectEl.appendChild(o2);
+    });
   });
 }
 
@@ -1883,8 +2038,9 @@ function openTabsImportModal() {
   if (!tabsOverlay) return;
   closeModal();
   closeGroupModal();
+  closeBookmarksImportModal();
   fillGroupSelect(fTabsGroup);
-  const first = groups.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0];
+  const first = topLevelGroupsSorted()[0] || groups[0];
   if (fTabsGroup && first) fTabsGroup.value = first.id;
   if (tabsSkipPinned) tabsSkipPinned.checked = false;
   tabsOverlay.classList.add('open');
@@ -1943,6 +2099,207 @@ async function addSelectedTabsAsShortcuts() {
   await persist();
   renderGroups();
   closeTabsImportModal();
+}
+
+// ─── Bookmarks import ───────────────────────────────────────────────────────
+
+function walkBookmarksForUrls(nodes, path, out) {
+  for (const n of nodes || []) {
+    if (n.url && /^https?:\/\//i.test(n.url)) {
+      out.push({
+        title: (n.title || '').trim() || hostnameFromUrl(n.url),
+        url: n.url,
+        pathStr: path.length ? path.join(' › ') : '',
+      });
+    }
+    if (n.children?.length) {
+      walkBookmarksForUrls(n.children, [...path, (n.title || 'Folder').trim() || 'Folder'], out);
+    }
+  }
+}
+
+async function refreshBookmarksImportList() {
+  if (!bookmarksListContainer || !bookmarksEmptyMsg) return;
+  bookmarksListContainer.innerHTML = '';
+  let tree = [];
+  try {
+    tree = await chrome.bookmarks.getTree();
+  } catch {
+    bookmarksEmptyMsg.hidden = false;
+    bookmarksEmptyMsg.textContent = 'Could not read bookmarks. Check extension permission.';
+    return;
+  }
+  const flat = [];
+  walkBookmarksForUrls(tree, [], flat);
+  const existing = existingShortcutUrlKeys();
+  const seen = new Set();
+  const rows = [];
+  for (const b of flat) {
+    const key = normalisedUrlKey(b.url);
+    if (!key || existing.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    rows.push(b);
+  }
+  if (!rows.length) {
+    bookmarksEmptyMsg.hidden = false;
+    bookmarksEmptyMsg.textContent = 'No http(s) bookmarks to import, or all are already shortcuts.';
+    return;
+  }
+  bookmarksEmptyMsg.hidden = true;
+  for (const b of rows) {
+    const row = document.createElement('div');
+    row.className = 'tabs-import-row';
+    row.setAttribute('role', 'listitem');
+    row.dataset.url = b.url;
+    row.innerHTML = `
+      <label class="tabs-import-check-label">
+        <input type="checkbox" class="tabs-import-check" />
+      </label>
+      <div class="tabs-import-fields">
+        <input type="text" class="tabs-import-name" spellcheck="false" autocomplete="off" />
+        <span class="tabs-import-host"></span>
+      </div>
+    `;
+    row.querySelector('.tabs-import-name').value = b.title;
+    row.querySelector('.tabs-import-host').textContent = b.pathStr || hostnameFromUrl(b.url);
+    bookmarksListContainer.appendChild(row);
+  }
+}
+
+function openBookmarksImportModal() {
+  if (!bookmarksOverlay) return;
+  closeModal();
+  closeGroupModal();
+  closeTabsImportModal();
+  fillGroupSelect(fBookmarksGroup);
+  const first = topLevelGroupsSorted()[0] || groups[0];
+  if (fBookmarksGroup && first) fBookmarksGroup.value = first.id;
+  bookmarksOverlay.classList.add('open');
+  refreshBookmarksImportList().then(() => {
+    const c = bookmarksListContainer?.querySelector('.tabs-import-check');
+    if (c) c.focus();
+  });
+}
+
+function closeBookmarksImportModal() {
+  bookmarksOverlay?.classList.remove('open');
+}
+
+async function addSelectedBookmarksAsShortcuts() {
+  if (!fBookmarksGroup || !bookmarksListContainer) return;
+  const groupId = fBookmarksGroup.value || groups[0]?.id;
+  if (!groupId) return;
+  const rows = bookmarksListContainer.querySelectorAll('.tabs-import-row');
+  const toAdd = [];
+  for (const row of rows) {
+    const cb = row.querySelector('.tabs-import-check');
+    if (!cb?.checked) continue;
+    const nameInput = row.querySelector('.tabs-import-name');
+    const url = row.dataset.url;
+    const name = nameInput?.value.trim() ?? '';
+    if (!name) {
+      if (nameInput) {
+        nameInput.focus();
+        shake(nameInput);
+      }
+      return;
+    }
+    const nu = normaliseUrl(url);
+    if (!nu) continue;
+    toAdd.push({ name, url: nu });
+  }
+  if (!toAdd.length) return;
+  let order = shortcutsForGroup(groupId).length;
+  let colorIdx = shortcuts.length;
+  for (const item of toAdd) {
+    shortcuts.push({
+      id: uid(),
+      groupId,
+      order: order++,
+      name: item.name,
+      url: item.url,
+      color: SWATCHES[colorIdx % SWATCHES.length],
+      svg: '',
+    });
+    colorIdx += 1;
+  }
+  await persist();
+  renderGroups();
+  closeBookmarksImportModal();
+}
+
+// ─── Shortcut filter & keyboard ──────────────────────────────────────────────
+
+function bindShortcutFilter() {
+  if (!shortcutFilter) return;
+  shortcutFilter.addEventListener('input', () => {
+    if (shortcutFilterDebounce) clearTimeout(shortcutFilterDebounce);
+    shortcutFilterDebounce = setTimeout(() => renderGroups(), 100);
+  });
+  shortcutFilter.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      shortcutFilter.value = '';
+      renderGroups();
+      shortcutFilter.blur();
+    }
+  });
+}
+
+function isTypingInField(el) {
+  if (!el) return false;
+  const t = el.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return true;
+  if (el.isContentEditable) return true;
+  return false;
+}
+
+function isAnyDialogOpen() {
+  return !!document.querySelector('.overlay.open');
+}
+
+function bindKeyboardShortcutsNav() {
+  document.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented) return;
+    const ae = document.activeElement;
+
+    if (e.key === '/') {
+      if (isTypingInField(ae) && ae !== shortcutFilter) return;
+      if (isAnyDialogOpen()) return;
+      e.preventDefault();
+      shortcutFilter?.focus();
+      shortcutFilter?.select();
+      return;
+    }
+
+    if (isTypingInField(ae)) return;
+    if (isAnyDialogOpen()) return;
+
+    if (e.key === '[' || e.key === ']') {
+      const secs = [...document.querySelectorAll('#groupsContainer .group-section')].filter(
+        (s) => s.getBoundingClientRect().height > 0 && window.getComputedStyle(s).display !== 'none',
+      );
+      if (!secs.length) return;
+      e.preventDefault();
+      let idx = secs.findIndex((s) => {
+        const r = s.getBoundingClientRect();
+        return r.top >= -20 && r.top < window.innerHeight * 0.35;
+      });
+      if (idx === -1) idx = e.key === '[' ? secs.length - 1 : 0;
+      else if (e.key === '[') idx = Math.max(0, idx - 1);
+      else idx = Math.min(secs.length - 1, idx + 1);
+      secs[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    const d = e.key.charCodeAt(0) - 49;
+    if (d >= 0 && d <= 8) {
+      const link = keyboardShortcutTargets[d];
+      if (link?.href) {
+        e.preventDefault();
+        window.location.href = link.href;
+      }
+    }
+  });
 }
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
@@ -2054,7 +2411,9 @@ function restoreFromBackup(file) {
           id: g.id || uid(),
           name: String(g.name || '').trim() || 'Group',
           order: g.order != null ? g.order : i,
+          parentId: g.parentId ?? null,
         }));
+        migrateGroupsParentId();
       }
       const firstGroupId = groups[0]?.id ?? uid();
       const validGroupIds = new Set(groups.map(g => g.id));
@@ -2192,9 +2551,11 @@ function bindEvents() {
     const down = e.target.closest('.group-move-down');
     const edit = e.target.closest('.group-edit');
     const addInGroup = e.target.closest('.add-shortcut-in-group');
+    const addSubgroup = e.target.closest('.add-subgroup');
     if (up) moveGroup(up.dataset.groupId, 'up');
     else if (down) moveGroup(down.dataset.groupId, 'down');
     else if (edit) openGroupModal(edit.dataset.groupId);
+    else if (addSubgroup) openGroupModal(null, addSubgroup.dataset.parentId);
     else if (addInGroup) openModal(null, addInGroup.dataset.groupId);
   });
 
@@ -2214,6 +2575,10 @@ function bindEvents() {
     if (e.key !== 'Escape') return;
     if (tabsOverlay?.classList.contains('open')) {
       closeTabsImportModal();
+      return;
+    }
+    if (bookmarksOverlay?.classList.contains('open')) {
+      closeBookmarksImportModal();
       return;
     }
     if (overlay.classList.contains('open')) closeModal();
@@ -2238,6 +2603,27 @@ function bindEvents() {
   if (tabsSelectNoneBtn) {
     tabsSelectNoneBtn.addEventListener('click', () => {
       tabsListContainer?.querySelectorAll('.tabs-import-check').forEach((c) => { c.checked = false; });
+    });
+  }
+
+  if (fromBookmarksBtn) fromBookmarksBtn.addEventListener('click', () => openBookmarksImportModal());
+  if (bookmarksCloseBtn) bookmarksCloseBtn.addEventListener('click', () => closeBookmarksImportModal());
+  if (bookmarksCancelBtn) bookmarksCancelBtn.addEventListener('click', () => closeBookmarksImportModal());
+  if (bookmarksAddBtn) bookmarksAddBtn.addEventListener('click', () => addSelectedBookmarksAsShortcuts());
+  if (bookmarksOverlay) {
+    bookmarksOverlay.addEventListener('click', (e) => {
+      if (e.target === bookmarksOverlay) closeBookmarksImportModal();
+    });
+  }
+  if (bookmarksRefreshBtn) bookmarksRefreshBtn.addEventListener('click', () => refreshBookmarksImportList());
+  if (bookmarksSelectAllBtn) {
+    bookmarksSelectAllBtn.addEventListener('click', () => {
+      bookmarksListContainer?.querySelectorAll('.tabs-import-check').forEach((c) => { c.checked = true; });
+    });
+  }
+  if (bookmarksSelectNoneBtn) {
+    bookmarksSelectNoneBtn.addEventListener('click', () => {
+      bookmarksListContainer?.querySelectorAll('.tabs-import-check').forEach((c) => { c.checked = false; });
     });
   }
 
